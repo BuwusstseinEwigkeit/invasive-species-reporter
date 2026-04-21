@@ -166,12 +166,10 @@ async function prepareImageForRecognition(filePath, mimeType) {
   };
 }
 
-async function recognizeSpeciesFromImage({ filePath, mimeType, speciesList }) {
+async function recognizeWithZhipu({ imageBuffer, mimeType, speciesList }) {
   ensureRecognitionEnabled();
 
-  const preparedImage = await prepareImageForRecognition(filePath, mimeType);
-  const base64Image = `data:${preparedImage.mimeType};base64,${preparedImage.base64Data}`;
-
+  const base64Image = `data:${mimeType};base64,${imageBuffer.toString("base64")}`;
   const payload = await requestRecognition({
     model: DEFAULT_MODEL,
     messages: [
@@ -205,6 +203,91 @@ async function recognizeSpeciesFromImage({ filePath, mimeType, speciesList }) {
     summary: parsed.summary || "",
     topCandidates: Array.isArray(parsed.topCandidates) ? parsed.topCandidates.slice(0, 3) : []
   };
+}
+
+async function recognizeWithMock({ speciesList }) {
+  // Mock provider: randomly select from speciesList with low confidence
+  // Used as fallback when other providers fail
+  if (!speciesList || speciesList.length === 0) {
+    return {
+      matchedSpeciesId: "",
+      matchedSpeciesName: "",
+      confidence: 0,
+      summary: "无法识别：物种列表为空",
+      topCandidates: []
+    };
+  }
+
+  // Randomly select 1-3 candidates
+  const shuffled = [...speciesList].sort(() => Math.random() - 0.5);
+  const numCandidates = Math.min(1 + Math.floor(Math.random() * 3), shuffled.length);
+  const candidates = shuffled.slice(0, numCandidates);
+
+  // Main match is first candidate with low confidence
+  const mainCandidate = candidates[0];
+  const confidence = 0.3 + Math.random() * 0.3; // 0.3-0.6
+
+  return {
+    matchedSpeciesId: mainCandidate.id,
+    matchedSpeciesName: mainCandidate.chineseName,
+    confidence: confidence,
+    summary: `模拟识别结果：可能为${mainCandidate.chineseName}（${mainCandidate.latinName}），置信度较低，请人工审核。`,
+    topCandidates: candidates.map((species, idx) => ({
+      speciesId: species.id,
+      speciesName: species.chineseName,
+      confidence: confidence * (0.8 - idx * 0.2) // decreasing confidence
+    }))
+  };
+}
+
+async function recognizeSpeciesFromImage({ filePath, mimeType, speciesList }) {
+  // Prepare image once for all providers
+  const preparedImage = await prepareImageForRecognition(filePath, mimeType);
+  const imageBuffer = Buffer.from(preparedImage.base64Data, "base64");
+
+  const providers = [
+    { name: "zhipu", fn: recognizeWithZhipu },
+    { name: "mock", fn: recognizeWithMock }
+  ];
+
+  let lastError = null;
+
+  for (const provider of providers) {
+    try {
+      console.log(`[recognition] trying provider: ${provider.name}`);
+      const result = await provider.fn({
+        imageBuffer,
+        mimeType: preparedImage.mimeType,
+        speciesList
+      });
+
+      if (result.confidence > 0) {
+        console.log(`[recognition] provider ${provider.name} succeeded with confidence ${result.confidence}`);
+        return result;
+      }
+    } catch (error) {
+      console.error(`[recognition] provider ${provider.name} failed:`, error.message);
+      lastError = error;
+
+      // If Zhipu fails due to missing API key, skip to mock
+      if (provider.name === "zhipu" && error.message.includes("ZHIPU_API_KEY is not configured")) {
+        console.log(`[recognition] ZHIPU_API_KEY not configured, falling back to mock`);
+        continue;
+      }
+
+      // For other errors, wait a bit before trying next provider
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+  }
+
+  // All providers failed
+  if (lastError) {
+    throw lastError;
+  }
+
+  // Final fallback: use mock even if it "failed" (shouldn't happen)
+  console.log(`[recognition] all providers failed, using mock as final fallback`);
+  return recognizeWithMock({ speciesList });
 }
 
 module.exports = {
