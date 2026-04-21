@@ -1,0 +1,31 @@
+<view class="page-shell">
+  <view class="card toolbar-card">
+    <input
+      class="search-input"
+      placeholder="搜索已核实物种、地点或备注"
+      value="{{searchKeyword}}"
+      bindinput="onSearchInput"
+    />
+  </view>
+
+  <view class="card empty-card" wx:if="{{!filteredReports.length}}">
+    <text class="muted">没有匹配的已核实记录。</text>
+  </view>
+
+  <view class="card report-card" wx:for="{{filteredReports}}" wx:key="id">
+    <text class="report-title">{{item.aiTop1}}</text>
+    <text class="muted">{{item.address}}</text>
+    <text class="muted">{{item.createdAt}}</text>
+    <text class="status-line">状态：{{item.status}}</text>
+    <text class="muted" wx:if="{{item.aiScore}}">AI 置信度：{{item.aiScore}}</text>
+    <image
+      wx:if="{{item.imageUrl}}"
+      class="report-image"
+      src="{{item.imageUrl}}"
+      mode="aspectFill"
+      lazy-load
+      data-url="{{item.imageUrl}}"
+      bindtap="previewImage"
+    />
+  </view>
+</view>

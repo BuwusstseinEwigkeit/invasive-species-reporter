@@ -1,0 +1,68 @@
+<view class="page-shell">
+  <view class="card review-header">
+    <text class="section-title">审核台</text>
+    <text class="muted">这里是演示版人工审核入口。只有审核通过的记录才会进入地图展示。</text>
+  </view>
+
+  <view class="card empty-card" wx:if="{{!reports.length}}">
+    <text class="muted">当前没有待审核记录。</text>
+  </view>
+
+  <view class="card review-card" wx:for="{{reports}}" wx:key="id">
+    <text class="review-title">{{item.address}}</text>
+    <text class="muted">上报时间：{{item.createdAt}}</text>
+    <text class="muted">AI 结果：{{item.aiTop1}}</text>
+    <text class="muted">备注：{{item.remark || "无"}}</text>
+
+    <view class="candidate-wrap" wx:if="{{item.aiCandidates && item.aiCandidates.length}}">
+      <text class="field-label">AI 候选</text>
+      <view class="candidate-row" wx:for="{{item.aiCandidates}}" wx:key="speciesId">
+        <text class="muted">{{item.speciesName}}</text>
+        <text class="muted">{{item.confidence}}</text>
+      </view>
+    </view>
+
+    <image
+      wx:if="{{item.imageUrl}}"
+      class="review-image"
+      src="{{item.imageUrl}}"
+      mode="aspectFill"
+      lazy-load
+      data-url="{{item.imageUrl}}"
+      bindtap="previewImage"
+    />
+
+    <view class="picker-wrap">
+      <text class="field-label">确认物种</text>
+      <picker
+        range="{{speciesNames}}"
+        value="{{item.reviewSpeciesIndex}}"
+        data-index="{{index}}"
+        bindchange="onSpeciesChange"
+      >
+        <view class="picker-box">{{speciesNames[item.reviewSpeciesIndex]}}</view>
+      </picker>
+    </view>
+
+    <view class="review-actions">
+      <button
+        class="primary-button"
+        data-id="{{item.id}}"
+        data-index="{{index}}"
+        data-action="approved"
+        bindtap="submitReview"
+      >
+        审核通过
+      </button>
+      <button
+        class="ghost-button"
+        data-id="{{item.id}}"
+        data-index="{{index}}"
+        data-action="rejected"
+        bindtap="submitReview"
+      >
+        驳回
+      </button>
+    </view>
+  </view>
+</view>

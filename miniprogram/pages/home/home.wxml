@@ -1,0 +1,87 @@
+<view class="page-shell">
+  <view class="hero card">
+    <view class="hero-topline">
+      <text class="hero-kicker">公众参与式监测</text>
+      <text class="version-chip">{{version}}</text>
+    </view>
+    <text class="hero-title">发现疑似外来物种，留下可追踪的生态线索。</text>
+    <text class="muted hero-copy">
+      当前版本已经支持真实上传、异步识别、人工审核、地图展示和已核实记录浏览。
+    </text>
+    <view class="hero-actions">
+      <button class="primary-button" bindtap="goReport">立即上报</button>
+      <button class="ghost-button" bindtap="goMap">查看地图</button>
+    </view>
+  </view>
+
+  <view class="card quick-card">
+    <text class="section-title">快捷入口</text>
+    <view class="quick-grid">
+      <view class="quick-item" bindtap="goReview">
+        <text class="quick-title">审核台</text>
+        <text class="muted">人工复核待审核记录</text>
+      </view>
+      <view class="quick-item" bindtap="goMyReports">
+        <text class="quick-title">我的上报</text>
+        <text class="muted">查看个人提交与状态</text>
+      </view>
+      <view class="quick-item" bindtap="goApprovedReports">
+        <text class="quick-title">已核实记录</text>
+        <text class="muted">浏览通过审核的数据</text>
+      </view>
+      <view class="quick-item" bindtap="goMap">
+        <text class="quick-title">风险地图</text>
+        <text class="muted">按物种查看已核实点位</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="stats card" wx:if="{{stats}}">
+    <text class="section-title">当前概况</text>
+    <view class="stats-grid">
+      <view class="stats-item">
+        <text class="stats-number">{{stats.totalReports}}</text>
+        <text class="muted">累计上报</text>
+      </view>
+      <view class="stats-item">
+        <text class="stats-number">{{stats.pendingReports}}</text>
+        <text class="muted">待审核</text>
+      </view>
+      <view class="stats-item">
+        <text class="stats-number">{{stats.approvedReports}}</text>
+        <text class="muted">已核实</text>
+      </view>
+      <view class="stats-item">
+        <text class="stats-number">{{stats.totalSpecies}}</text>
+        <text class="muted">重点物种</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="card">
+    <text class="section-title">重点物种</text>
+    <view
+      class="species-row"
+      wx:for="{{species}}"
+      wx:key="id"
+      data-id="{{item.id}}"
+      bindtap="openDetail"
+    >
+      <image
+        wx:if="{{item.avatar}}"
+        class="species-avatar"
+        src="{{item.avatar}}"
+        mode="aspectFill"
+        lazy-load
+        data-id="{{item.id}}"
+        bindtap="openDetail"
+      />
+      <view wx:else class="species-badge" data-id="{{item.id}}" bindtap="openDetail">{{item.category}}</view>
+      <view class="species-copy" data-id="{{item.id}}" bindtap="openDetail">
+        <text class="species-name">{{item.chineseName}}</text>
+        <text class="muted">{{item.latinName}}</text>
+        <text class="risk-line">风险等级：{{item.riskLevel}}</text>
+      </view>
+    </view>
+  </view>
+</view>

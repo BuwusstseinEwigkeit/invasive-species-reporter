@@ -1,0 +1,77 @@
+.form-card {
+  display: flex;
+  flex-direction: column;
+  gap: 24rpx;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 14rpx;
+}
+
+.field-label {
+  font-size: 28rpx;
+  font-weight: 700;
+}
+
+.preview-image {
+  width: 100%;
+  height: 360rpx;
+  border-radius: 24rpx;
+}
+
+.picker-box {
+  background: #f7f7f1;
+  border-radius: 18rpx;
+  padding: 20rpx;
+  color: #1f2a1f;
+}
+
+.search-input {
+  width: 100%;
+  background: #f7f7f1;
+  border-radius: 18rpx;
+  padding: 20rpx;
+  box-sizing: border-box;
+}
+
+.ai-card {
+  background: #eef4eb;
+  padding: 20rpx;
+  border-radius: 20rpx;
+}
+
+.ai-name {
+  font-size: 30rpx;
+  font-weight: 700;
+}
+
+.candidate-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10rpx;
+  margin-top: 10rpx;
+}
+
+.candidate-row {
+  display: flex;
+  justify-content: space-between;
+}
+
+.retry-button {
+  margin-top: 16rpx;
+}
+
+.remark-box {
+  width: 100%;
+  min-height: 180rpx;
+  background: #f7f7f1;
+  border-radius: 18rpx;
+  padding: 20rpx;
+  box-sizing: border-box;
+}
+
+.submit-button {
+  margin-top: 12rpx;
+}

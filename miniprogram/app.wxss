@@ -1,0 +1,42 @@
+page {
+  background: #f7f4ea;
+  color: #1f2a1f;
+  font-family: "Microsoft YaHei", sans-serif;
+}
+
+.page-shell {
+  padding: 24rpx;
+}
+
+.card {
+  background: #fffdf7;
+  border-radius: 28rpx;
+  padding: 28rpx;
+  box-shadow: 0 16rpx 30rpx rgba(52, 76, 52, 0.08);
+}
+
+.section-title {
+  font-size: 34rpx;
+  font-weight: 700;
+  margin-bottom: 20rpx;
+}
+
+.muted {
+  color: #6b786b;
+}
+
+.primary-button {
+  background: #305d3c;
+  color: #ffffff;
+  border-radius: 999rpx;
+  padding: 0 28rpx;
+  font-size: 28rpx;
+}
+
+.ghost-button {
+  background: #e7efe5;
+  color: #305d3c;
+  border-radius: 999rpx;
+  padding: 0 28rpx;
+  font-size: 28rpx;
+}

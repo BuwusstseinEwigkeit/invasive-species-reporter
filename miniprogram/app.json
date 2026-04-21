@@ -1,0 +1,20 @@
+{
+  "pages": [
+    "pages/home/home",
+    "pages/report/report",
+    "pages/map/map",
+    "pages/detail/detail",
+    "pages/review/review",
+    "pages/my-reports/my-reports",
+    "pages/approved-reports/approved-reports"
+  ],
+  "window": {
+    "navigationBarTitleText": "外来物种哨点",
+    "navigationBarBackgroundColor": "#f7f4ea",
+    "navigationBarTextStyle": "black",
+    "backgroundColor": "#f7f4ea",
+    "backgroundTextStyle": "light"
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json"
+}

@@ -1,0 +1,39 @@
+<view class="page-shell" wx:if="{{item}}">
+  <image wx:if="{{coverImage}}" class="cover-image" src="{{coverImage}}" mode="aspectFill" lazy-load />
+  <image wx:elif="{{item.avatar}}" class="cover-image" src="{{item.avatar}}" mode="aspectFill" lazy-load />
+  <view wx:else class="cover-fallback">
+    <text class="cover-text">{{item.category}}</text>
+  </view>
+
+  <view class="card detail-card">
+    <text class="title">{{item.chineseName}}</text>
+    <text class="latin">{{item.latinName}}</text>
+    <text class="meta">类别：{{item.category}} · 风险等级：{{item.riskLevel}}</text>
+
+    <view class="detail-block">
+      <text class="block-title">简介</text>
+      <text class="muted">{{item.summary}}</text>
+    </view>
+
+    <view class="detail-block">
+      <text class="block-title">主要危害</text>
+      <text class="muted">{{item.harm}}</text>
+    </view>
+
+    <view class="detail-block">
+      <text class="block-title">建议</text>
+      <text class="muted">{{item.suggestion}}</text>
+    </view>
+  </view>
+
+  <view class="card history-card">
+    <text class="section-title">最近记录</text>
+    <view class="history-row" wx:for="{{reports}}" wx:key="id">
+      <view class="history-main">
+        <text class="history-address">{{item.address}}</text>
+        <text class="muted">{{item.createdAt}}</text>
+      </view>
+      <text class="status-tag">{{item.status}}</text>
+    </view>
+  </view>
+</view>

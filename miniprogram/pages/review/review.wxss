@@ -1,0 +1,53 @@
+.review-header,
+.review-card,
+.empty-card {
+  margin-bottom: 24rpx;
+}
+
+.review-title {
+  display: block;
+  font-size: 30rpx;
+  font-weight: 700;
+  margin-bottom: 8rpx;
+}
+
+.picker-wrap {
+  margin-top: 18rpx;
+}
+
+.review-image {
+  width: 100%;
+  height: 320rpx;
+  border-radius: 20rpx;
+  margin-top: 18rpx;
+}
+
+.candidate-wrap {
+  margin-top: 18rpx;
+}
+
+.candidate-row {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8rpx;
+}
+
+.field-label {
+  display: block;
+  font-size: 28rpx;
+  font-weight: 700;
+  margin-bottom: 12rpx;
+}
+
+.picker-box {
+  background: #f7f7f1;
+  border-radius: 18rpx;
+  padding: 20rpx;
+  color: #1f2a1f;
+}
+
+.review-actions {
+  display: flex;
+  gap: 16rpx;
+  margin-top: 24rpx;
+}

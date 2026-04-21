@@ -1,0 +1,88 @@
+.cover-image,
+.cover-fallback {
+  width: 100%;
+  height: 420rpx;
+}
+
+.cover-image {
+  display: block;
+}
+
+.cover-fallback {
+  background: linear-gradient(145deg, #355e3b, #9db37f);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cover-text {
+  color: #ffffff;
+  font-size: 72rpx;
+  font-weight: 700;
+}
+
+.detail-card {
+  margin-top: -48rpx;
+  position: relative;
+}
+
+.title {
+  display: block;
+  font-size: 42rpx;
+  font-weight: 700;
+}
+
+.latin {
+  display: block;
+  margin-top: 8rpx;
+  color: #546454;
+}
+
+.meta {
+  display: block;
+  margin-top: 12rpx;
+  color: #305d3c;
+}
+
+.detail-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10rpx;
+  margin-top: 24rpx;
+}
+
+.block-title {
+  font-size: 28rpx;
+  font-weight: 700;
+}
+
+.history-card {
+  margin-top: 24rpx;
+}
+
+.history-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 18rpx 0;
+  border-bottom: 1rpx solid #ece8da;
+}
+
+.history-main {
+  flex: 1;
+  padding-right: 20rpx;
+}
+
+.history-address {
+  display: block;
+  font-size: 28rpx;
+  font-weight: 700;
+}
+
+.status-tag {
+  background: #eef4eb;
+  color: #305d3c;
+  padding: 8rpx 14rpx;
+  border-radius: 999rpx;
+  font-size: 22rpx;
+}

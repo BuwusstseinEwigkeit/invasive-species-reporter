@@ -1,0 +1,31 @@
+<view class="map-shell">
+  <map
+    class="map-area"
+    latitude="{{latitude}}"
+    longitude="{{longitude}}"
+    markers="{{markers}}"
+    scale="10"
+    show-location
+  />
+
+  <view class="list-panel">
+    <text class="section-title">已核实点位</text>
+    <picker range="{{speciesNames}}" value="{{selectedSpeciesIndex}}" bindchange="onSpeciesChange">
+      <view class="filter-box">{{speciesNames[selectedSpeciesIndex]}}</view>
+    </picker>
+
+    <view
+      class="report-row"
+      wx:for="{{reports}}"
+      wx:key="id"
+      data-id="{{item.speciesId}}"
+      bindtap="openDetail"
+    >
+      <view>
+        <text class="report-name">{{item.aiTop1}}</text>
+        <text class="muted">{{item.address}}</text>
+      </view>
+      <text class="status-tag">已核实</text>
+    </view>
+  </view>
+</view>

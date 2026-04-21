@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.DS_Store
+*.log
+Thumbs.db
+miniprogram/.idea/
+server/uploads/*
+!server/uploads/.gitkeep
+server/data/runtime-data.json

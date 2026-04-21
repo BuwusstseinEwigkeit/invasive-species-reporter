@@ -1,0 +1,69 @@
+<view class="page-shell">
+  <view class="card form-card">
+    <text class="section-title">创建疑似线索</text>
+
+    <view class="field">
+      <text class="field-label">现场图片</text>
+      <button class="ghost-button" bindtap="chooseImage">选择并上传图片</button>
+      <image wx:if="{{localImageUrl}}" class="preview-image" src="{{localImageUrl}}" mode="aspectFill" lazy-load />
+      <text class="muted" wx:if="{{isUploading}}">图片上传中...</text>
+      <text class="muted" wx:if="{{uploadedImageUrl && !isUploading}}">图片已上传到服务端</text>
+      <text class="muted">上传前会自动压缩图片，降低识别超时概率。</text>
+    </view>
+
+    <view class="field">
+      <text class="field-label">发现位置</text>
+      <button class="ghost-button" bindtap="chooseLocation">选择位置</button>
+      <text class="muted" wx:if="{{address}}">{{address}}</text>
+    </view>
+
+    <view class="field ai-card">
+      <text class="field-label">AI 初筛结果</text>
+      <text class="ai-name">{{aiTop1}}</text>
+      <text class="muted" wx:if="{{isRecognizing}}">后台识别中，你可以继续填写位置和备注。</text>
+      <text class="muted" wx:if="{{aiScore}}">置信度：{{aiScore}}</text>
+      <text class="muted" wx:if="{{aiSummary}}">{{aiSummary}}</text>
+      <view class="candidate-list" wx:if="{{aiCandidates.length}}">
+        <view class="candidate-row" wx:for="{{aiCandidates}}" wx:key="speciesId">
+          <text class="muted">{{item.speciesName}}</text>
+          <text class="muted">{{item.confidence}}</text>
+        </view>
+      </view>
+      <button
+        wx:if="{{uploadedFileId && !isRecognizing}}"
+        class="ghost-button retry-button"
+        bindtap="retryRecognition"
+      >
+        重新识别
+      </button>
+    </view>
+
+    <view class="field">
+      <text class="field-label">确认或修正物种</text>
+      <input
+        class="search-input"
+        placeholder="搜索物种中文名、学名或分类"
+        value="{{searchKeyword}}"
+        bindinput="onSearchInput"
+      />
+      <picker range="{{filteredSpeciesNames}}" value="0" bindchange="onSpeciesChange">
+        <view class="picker-box">
+          {{selectedSpeciesIndex > 0 ? speciesNames[selectedSpeciesIndex] : "暂不选择"}}
+        </view>
+      </picker>
+      <text class="muted">如果 AI 判断不稳，可以在提交前手动修正。</text>
+    </view>
+
+    <view class="field">
+      <text class="field-label">补充说明</text>
+      <textarea
+        class="remark-box"
+        maxlength="200"
+        placeholder="例如数量、周边环境、是否成片扩散"
+        bindinput="onRemarkInput"
+      />
+    </view>
+
+    <button class="primary-button submit-button" bindtap="submitReport">提交审核</button>
+  </view>
+</view>

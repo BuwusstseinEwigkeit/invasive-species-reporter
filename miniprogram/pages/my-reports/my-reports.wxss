@@ -1,0 +1,39 @@
+.toolbar-card,
+.empty-card,
+.report-card {
+  margin-bottom: 24rpx;
+}
+
+.search-input,
+.filter-box {
+  width: 100%;
+  background: #f7f7f1;
+  border-radius: 18rpx;
+  padding: 20rpx;
+  box-sizing: border-box;
+}
+
+.filter-box {
+  margin-top: 14rpx;
+  color: #1f2a1f;
+}
+
+.report-title {
+  display: block;
+  font-size: 30rpx;
+  font-weight: 700;
+  margin-bottom: 8rpx;
+}
+
+.status-line {
+  display: block;
+  margin-top: 8rpx;
+  color: #305d3c;
+}
+
+.report-image {
+  width: 100%;
+  height: 320rpx;
+  margin-top: 18rpx;
+  border-radius: 20rpx;
+}
