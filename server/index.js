@@ -64,6 +64,7 @@ app.use((req, res, next) => {
 
 app.use(express.json({ limit: "2mb" }));
 app.use("/uploads", express.static(uploadsDir));
+app.use("/static", express.static(path.join(__dirname, "static")));
 
 function getPublicBaseUrl(req) {
   return process.env.SERVER_PUBLIC_BASE_URL || `${req.protocol}://${req.get("host")}`;

@@ -5,7 +5,7 @@ const species = [
     latinName: "Solidago canadensis",
     category: "植物",
     riskLevel: "高",
-    avatar: "https://commons.wikimedia.org/wiki/Special:FilePath/Solidago%20canadensis%20%284973669237%29.jpg",
+    avatar: "/uploads/species/species-001.jpg",
     summary: "多年生草本植物，常在荒地、河岸和道路两侧快速扩散。",
     harm: "会挤压本地植物生境，降低生物多样性，并增加绿地和农田管理压力。",
     suggestion: "发现成片扩散时应记录时间和位置，并联系属地管理部门复核。"
@@ -16,7 +16,7 @@ const species = [
     latinName: "Pomacea canaliculata",
     category: "动物",
     riskLevel: "高",
-    avatar: "https://commons.wikimedia.org/wiki/Special:FilePath/Pomacea%20canaliculata%2001.JPG",
+    avatar: "/static/species/species-002.jpg",
     summary: "大型淡水螺类，常见于稻田、池塘和沟渠环境。",
     harm: "危害水稻和水生植物，也存在传播寄生虫的公共卫生风险。",
     suggestion: "上报时尽量同时记录卵块、成体和周边水域环境，不建议自行大规模处置。"
