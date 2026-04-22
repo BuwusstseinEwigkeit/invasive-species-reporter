@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Invasive Species Reporter
 
 一个面向微信小程序场景的外来物种上报项目骨架，目标是先跑通 `发现 -> 上传 -> 识别 -> 上报 -> 审核 -> 地图展示` 的闭环。
@@ -58,3 +59,7 @@ node server/index.js
 2. 给审核台加登录和角色权限。
 3. 增加真实数据库而不是内存数组。
 4. 后续再做热点分析和扩散预测。
+=======
+# invasive-species-reporter
+My own Program
+>>>>>>> 6e9d11ff69115ae414574f9aca0fd784623fb5f1
