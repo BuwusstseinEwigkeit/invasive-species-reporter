@@ -1,3 +1,5 @@
 {
-  "navigationBarTitleText": "已核实记录"
+  "navigationBarTitleText": "已核实记录",
+  "enablePullDownRefresh": true,
+  "backgroundColor": "#f7f4ea"
 }

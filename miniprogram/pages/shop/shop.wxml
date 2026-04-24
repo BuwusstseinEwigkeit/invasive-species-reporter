@@ -1,0 +1,51 @@
+<view class="page-shell">
+  <view class="card shop-header">
+    <text class="section-title">积分商城</text>
+    <text class="muted">用上报和审核获得的积分兑换奖励。</text>
+    <view class="points-badge" wx:if="{{loggedIn}}">
+      <text class="points-badge-label">当前积分：</text>
+      <text class="points-badge-num">{{points}}</text>
+    </view>
+    <button wx:else class="ghost-button" hover-class="hover-scale" bindtap="goLogin">登录查看积分</button>
+  </view>
+
+  <!-- Loading -->
+  <view class="loading-card" wx:if="{{loading}}">
+    <view class="skeleton-line w80"></view>
+    <view class="skeleton-line w60"></view>
+    <view class="skeleton-line w90"></view>
+  </view>
+
+  <!-- Empty -->
+  <view class="empty-state" wx:elif="{{!loading && !products.length}}">
+    <text class="empty-icon">🎁</text>
+    <text class="muted">暂无商品</text>
+  </view>
+
+  <!-- Product grid -->
+  <view class="product-grid" wx:else>
+    <view class="product-card" wx:for="{{products}}" wx:key="id">
+      <view class="product-image">
+        <text class="product-img-placeholder">{{item.name.slice(0, 1)}}</text>
+      </view>
+      <view class="product-body">
+        <text class="product-name">{{item.name}}</text>
+        <text class="muted product-desc">{{item.description}}</text>
+        <view class="product-footer">
+          <text class="product-price">{{item.pointsCost}} 积分</text>
+          <button
+            class="primary-button buy-btn"
+            hover-class="hover-scale"
+            data-id="{{item.id}}"
+            bindtap="buyProduct"
+            wx:if="{{points >= item.pointsCost || !loggedIn}}"
+          >兑换</button>
+          <button
+            class="ghost-button buy-btn disabled-btn"
+            wx:else
+          >积分不足</button>
+        </view>
+      </view>
+    </view>
+  </view>
+</view>

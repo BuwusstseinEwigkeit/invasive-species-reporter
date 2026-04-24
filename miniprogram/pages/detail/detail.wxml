@@ -1,6 +1,5 @@
 <view class="page-shell" wx:if="{{item}}">
   <image wx:if="{{coverImage}}" class="cover-image" src="{{coverImage}}" mode="aspectFill" lazy-load />
-  <image wx:elif="{{item.avatar}}" class="cover-image" src="{{item.avatar}}" mode="aspectFill" lazy-load />
   <view wx:else class="cover-fallback">
     <text class="cover-text">{{item.category}}</text>
   </view>
@@ -10,19 +9,34 @@
     <text class="latin">{{item.latinName}}</text>
     <text class="meta">类别：{{item.category}} · 风险等级：{{item.riskLevel}}</text>
 
-    <view class="detail-block">
-      <text class="block-title">简介</text>
-      <text class="muted">{{item.summary}}</text>
+    <view class="accordion-block">
+      <view class="accordion-header" hover-class="hover-tap" bindtap="toggleAccordion" data-key="summary">
+        <text class="block-title">简介</text>
+        <view class="arrow {{accordion.summary ? 'arrow-down' : ''}}"></view>
+      </view>
+      <view class="accordion-body {{accordion.summary ? '' : 'hidden'}}">
+        <text class="muted">{{item.summary}}</text>
+      </view>
     </view>
 
-    <view class="detail-block">
-      <text class="block-title">主要危害</text>
-      <text class="muted">{{item.harm}}</text>
+    <view class="accordion-block">
+      <view class="accordion-header" hover-class="hover-tap" bindtap="toggleAccordion" data-key="harm">
+        <text class="block-title">主要危害</text>
+        <view class="arrow {{accordion.harm ? 'arrow-down' : ''}}"></view>
+      </view>
+      <view class="accordion-body {{accordion.harm ? '' : 'hidden'}}">
+        <text class="muted">{{item.harm}}</text>
+      </view>
     </view>
 
-    <view class="detail-block">
-      <text class="block-title">建议</text>
-      <text class="muted">{{item.suggestion}}</text>
+    <view class="accordion-block">
+      <view class="accordion-header" hover-class="hover-tap" bindtap="toggleAccordion" data-key="suggestion">
+        <text class="block-title">建议</text>
+        <view class="arrow {{accordion.suggestion ? 'arrow-down' : ''}}"></view>
+      </view>
+      <view class="accordion-body {{accordion.suggestion ? '' : 'hidden'}}">
+        <text class="muted">{{item.suggestion}}</text>
+      </view>
     </view>
   </view>
 

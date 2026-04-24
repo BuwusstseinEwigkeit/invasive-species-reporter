@@ -1,3 +1,5 @@
 {
-  "navigationBarTitleText": "审核台"
+  "navigationBarTitleText": "审核台",
+  "enablePullDownRefresh": true,
+  "backgroundColor": "#f7f4ea"
 }

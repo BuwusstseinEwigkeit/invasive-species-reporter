@@ -1,12 +1,15 @@
 {
   "pages": [
     "pages/home/home",
-    "pages/report/report",
     "pages/map/map",
+    "pages/report/report",
     "pages/detail/detail",
     "pages/review/review",
     "pages/my-reports/my-reports",
-    "pages/approved-reports/approved-reports"
+    "pages/approved-reports/approved-reports",
+    "pages/login/login",
+    "pages/profile/profile",
+    "pages/shop/shop"
   ],
   "window": {
     "navigationBarTitleText": "外来物种哨点",
@@ -14,6 +17,38 @@
     "navigationBarTextStyle": "black",
     "backgroundColor": "#f7f4ea",
     "backgroundTextStyle": "light"
+  },
+  "tabBar": {
+    "color": "#9e9e9e",
+    "selectedColor": "#305d3c",
+    "backgroundColor": "#ffffff",
+    "borderStyle": "white",
+    "list": [
+      {
+        "pagePath": "pages/home/home",
+        "text": "首页",
+        "iconPath": "images/tab-home.png",
+        "selectedIconPath": "images/tab-home-sel.png"
+      },
+      {
+        "pagePath": "pages/map/map",
+        "text": "地图",
+        "iconPath": "images/tab-map.png",
+        "selectedIconPath": "images/tab-map-sel.png"
+      },
+      {
+        "pagePath": "pages/report/report",
+        "text": "上报",
+        "iconPath": "images/tab-report.png",
+        "selectedIconPath": "images/tab-report-sel.png"
+      },
+      {
+        "pagePath": "pages/profile/profile",
+        "text": "我的",
+        "iconPath": "images/tab-profile.png",
+        "selectedIconPath": "images/tab-profile-sel.png"
+      }
+    ]
   },
   "style": "v2",
   "sitemapLocation": "sitemap.json"

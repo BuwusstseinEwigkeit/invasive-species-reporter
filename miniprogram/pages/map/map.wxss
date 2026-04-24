@@ -15,6 +15,58 @@
   border-radius: 28rpx 28rpx 0 0;
   margin-top: -12rpx;
   padding: 24rpx;
+  padding-bottom: calc(24rpx + env(safe-area-inset-bottom));
+  transition: flex 0.25s ease;
+  display: flex;
+  flex-direction: column;
+}
+
+.list-panel.collapsed {
+  flex: 0 0 auto;
+}
+
+.panel-handle {
+  display: flex;
+  justify-content: center;
+  padding: 6rpx 0 14rpx;
+  cursor: pointer;
+  user-select: none;
+}
+
+.handle-bar {
+  width: 64rpx;
+  height: 6rpx;
+  background: #d4d8c8;
+  border-radius: 999rpx;
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20rpx;
+}
+
+.panel-header .section-title {
+  margin-bottom: 0;
+}
+
+.panel-toggle {
+  padding: 8rpx;
+  cursor: pointer;
+  user-select: none;
+}
+
+.panel-body {
+  overflow: hidden;
+  transition: max-height 0.25s ease, opacity 0.2s ease;
+  max-height: 2000rpx;
+  opacity: 1;
+}
+
+.panel-body.hidden {
+  max-height: 0;
+  opacity: 0;
 }
 
 .filter-box {
@@ -29,7 +81,9 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 20rpx 0;
+  padding: 20rpx 16rpx;
+  border-radius: 16rpx;
+  margin: 0 -8rpx;
   border-bottom: 1rpx solid #ece8da;
 }
 

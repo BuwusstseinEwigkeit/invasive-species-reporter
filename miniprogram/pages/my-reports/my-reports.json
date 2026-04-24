@@ -1,3 +1,5 @@
 {
-  "navigationBarTitleText": "我的上报"
+  "navigationBarTitleText": "我的上报",
+  "enablePullDownRefresh": true,
+  "backgroundColor": "#f7f4ea"
 }

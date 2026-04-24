@@ -6,6 +6,7 @@ page {
 
 .page-shell {
   padding: 24rpx;
+  padding-bottom: calc(48rpx + env(safe-area-inset-bottom));
 }
 
 .card {
@@ -39,4 +40,75 @@ page {
   border-radius: 999rpx;
   padding: 0 28rpx;
   font-size: 28rpx;
+}
+
+/* --- Interaction feedback --- */
+
+.hover-tap {
+  opacity: 0.72;
+  transition: opacity 0.15s ease;
+}
+
+.hover-scale {
+  transform: scale(0.96);
+  transition: transform 0.15s ease;
+}
+
+.hover-bg {
+  background-color: rgba(48, 93, 60, 0.06);
+  transition: background-color 0.15s ease;
+}
+
+/* --- Collapsible section header --- */
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12rpx 0;
+  cursor: pointer;
+  user-select: none;
+}
+
+.section-header .section-title {
+  margin-bottom: 0;
+}
+
+/* Arrow indicator — pure CSS right-facing triangle */
+.arrow {
+  display: inline-block;
+  width: 0;
+  height: 0;
+  border-left: 12rpx solid #6b786b;
+  border-top: 8rpx solid transparent;
+  border-bottom: 8rpx solid transparent;
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+}
+
+.arrow-down {
+  transform: rotate(90deg);
+}
+
+/* Collapsible body wrapper */
+.collapse-body {
+  overflow: hidden;
+  transition: max-height 0.25s ease, opacity 0.2s ease;
+  max-height: 2000rpx;
+  opacity: 1;
+}
+
+.collapse-body.hidden {
+  max-height: 0;
+  opacity: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+/* --- Top-right hero section common --- */
+
+.hero-topline {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }

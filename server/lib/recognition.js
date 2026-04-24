@@ -205,6 +205,58 @@ async function recognizeWithZhipu({ imageBuffer, mimeType, speciesList }) {
   };
 }
 
+// --- Ollama (local model) provider ---
+
+const OLLAMA_HOST = process.env.OLLAMA_HOST || "http://localhost:11434";
+const OLLAMA_VISION_MODEL = process.env.OLLAMA_VISION_MODEL || "";
+
+async function recognizeWithOllama({ imageBuffer, mimeType, speciesList }) {
+  if (!OLLAMA_VISION_MODEL) {
+    throw new Error("OLLAMA_VISION_MODEL is not configured.");
+  }
+
+  const base64Image = imageBuffer.toString("base64");
+  const promptText = `${buildPrompt(speciesList)}\n\n请识别这张图中的疑似外来物种，并按要求返回 JSON。`;
+
+  const response = await fetch(`${OLLAMA_HOST}/api/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: OLLAMA_VISION_MODEL,
+      messages: [
+        {
+          role: "user",
+          content: promptText,
+          images: [base64Image]
+        }
+      ],
+      stream: false,
+      options: {
+        temperature: 0.1
+      }
+    })
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Ollama request failed: ${response.status} ${errorText}`);
+  }
+
+  const payload = await response.json();
+  const text = (payload.message && payload.message.content) || "";
+  const parsed = extractJson(text);
+
+  return {
+    matchedSpeciesId: parsed.matchedSpeciesId || "",
+    matchedSpeciesName: parsed.matchedSpeciesName || "",
+    confidence: Number(parsed.confidence || 0),
+    summary: parsed.summary || "",
+    topCandidates: Array.isArray(parsed.topCandidates) ? parsed.topCandidates.slice(0, 3) : []
+  };
+}
+
+// --- Mock provider ---
+
 async function recognizeWithMock({ speciesList }) {
   // Mock provider: randomly select from speciesList with low confidence
   // Used as fallback when other providers fail
@@ -245,10 +297,18 @@ async function recognizeSpeciesFromImage({ filePath, mimeType, speciesList }) {
   const preparedImage = await prepareImageForRecognition(filePath, mimeType);
   const imageBuffer = Buffer.from(preparedImage.base64Data, "base64");
 
+  // Primary chain: Zhipu (cloud) -> mock (degraded fallback)
   const providers = [
-    { name: "zhipu", fn: recognizeWithZhipu },
-    { name: "mock", fn: recognizeWithMock }
+    { name: "zhipu", fn: recognizeWithZhipu }
   ];
+
+  // Optional: Ollama local model for dev/testing only (set OLLAMA_VISION_MODEL to enable)
+  if (OLLAMA_VISION_MODEL) {
+    providers.push({ name: "ollama", fn: recognizeWithOllama });
+  }
+
+  // Always have mock as final fallback
+  providers.push({ name: "mock", fn: recognizeWithMock });
 
   let lastError = null;
 
@@ -269,9 +329,9 @@ async function recognizeSpeciesFromImage({ filePath, mimeType, speciesList }) {
       console.error(`[recognition] provider ${provider.name} failed:`, error.message);
       lastError = error;
 
-      // If Zhipu fails due to missing API key, skip to mock
+      // If Zhipu fails due to missing API key, skip to next provider
       if (provider.name === "zhipu" && error.message.includes("ZHIPU_API_KEY is not configured")) {
-        console.log(`[recognition] ZHIPU_API_KEY not configured, falling back to mock`);
+        console.log(`[recognition] ZHIPU_API_KEY not configured, falling back to next provider`);
         continue;
       }
 

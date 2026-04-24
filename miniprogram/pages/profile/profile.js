@@ -1,0 +1,114 @@
+var api = require("../../utils/api");
+
+Page({
+  data: {
+    loggedIn: false,
+    username: "",
+    role: "",
+    userId: "",
+    points: 0,
+    pointsLogs: [],
+    loading: true,
+    logsCollapsed: false
+  },
+
+  toggleLogs() {
+    this.setData({ logsCollapsed: !this.data.logsCollapsed });
+  },
+
+  onPullDownRefresh() {
+    this.checkLogin();
+    wx.stopPullDownRefresh();
+  },
+
+  onShow() {
+    this.checkLogin();
+  },
+
+  checkLogin() {
+    var token = api.getToken();
+    if (token) {
+      var username = api.getMyUsername();
+      var userId = api.getMyUserId();
+      var role = api.getMyRole();
+      this.setData({
+        loggedIn: true,
+        username: username,
+        userId: userId,
+        role: role,
+        loading: true
+      });
+      this.loadPoints();
+    } else {
+      this.setData({
+        loggedIn: false,
+        loading: false
+      });
+    }
+  },
+
+  async loadPoints() {
+    try {
+      var userId = this.data.userId;
+      if (!userId) return;
+      var res = await api.getPoints(userId);
+      this.setData({
+        points: res.item.total || 0,
+        pointsLogs: (res.item.logs || []).slice(0, 10),
+        loading: false
+      });
+    } catch (_e) {
+      this.setData({
+        points: 0,
+        pointsLogs: [],
+        loading: false
+      });
+    }
+  },
+
+  goLogin() {
+    wx.navigateTo({ url: "/pages/login/login" });
+  },
+
+  onLogout() {
+    var self = this;
+    wx.showModal({
+      title: "退出登录",
+      content: "确定要退出当前账号吗？",
+      success(res) {
+        if (res.confirm) {
+          api.clearToken();
+          self.setData({
+            loggedIn: false,
+            username: "",
+            userId: "",
+            role: "",
+            points: 0,
+            pointsLogs: []
+          });
+          wx.showToast({ title: "已退出", icon: "success" });
+        }
+      }
+    });
+  },
+
+  goMyReports() {
+    wx.navigateTo({ url: "/pages/my-reports/my-reports" });
+  },
+
+  goApprovedReports() {
+    wx.navigateTo({ url: "/pages/approved-reports/approved-reports" });
+  },
+
+  goShop() {
+    wx.navigateTo({ url: "/pages/shop/shop" });
+  },
+
+  goReview() {
+    wx.navigateTo({ url: "/pages/review/review" });
+  },
+
+  goMyDetail() {
+    wx.showToast({ title: "功能开发中", icon: "none" });
+  }
+});

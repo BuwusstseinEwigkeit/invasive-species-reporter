@@ -9,7 +9,12 @@ Page({
     allReports: [],
     speciesOptions: [],
     speciesNames: ["全部物种"],
-    selectedSpeciesIndex: 0
+    selectedSpeciesIndex: 0,
+    panelCollapsed: false
+  },
+
+  togglePanel() {
+    this.setData({ panelCollapsed: !this.data.panelCollapsed });
   },
 
   onShow() {
@@ -55,17 +60,21 @@ Page({
       : this.data.allReports.slice();
 
     const markers = reports.map((item, index) => ({
-      id: index + 1,
+      id: index,
       latitude: item.latitude,
       longitude: item.longitude,
-      width: 28,
-      height: 28,
-      title: item.aiTop1,
-      callout: {
+      width: 32,
+      height: 32,
+      title: item.speciesId,
+      label: {
         content: item.aiTop1,
-        display: "BYCLICK",
-        borderRadius: 12,
-        padding: 8
+        fontSize: 12,
+        borderWidth: 1,
+        borderColor: "#305d3c",
+        borderRadius: 8,
+        padding: 4,
+        bgColor: "#ffffff",
+        textAlign: "center"
       }
     }));
 
@@ -75,8 +84,20 @@ Page({
     });
   },
 
+  onMarkerTap(event) {
+    const markerId = event.detail.markerId;
+    if (markerId === undefined) return;
+    const report = this.data.reports[markerId];
+    if (report && report.speciesId) {
+      wx.navigateTo({
+        url: `/pages/detail/detail?id=${report.speciesId}`
+      });
+    }
+  },
+
   openDetail(event) {
     const { id } = event.currentTarget.dataset;
+    if (!id || id === "null" || id === "undefined") return;
     wx.navigateTo({
       url: `/pages/detail/detail?id=${id}`
     });

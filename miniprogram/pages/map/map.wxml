@@ -6,26 +6,41 @@
     markers="{{markers}}"
     scale="10"
     show-location
+    bindmarkertap="onMarkerTap"
+    bindcallouttap="onMarkerTap"
   />
 
-  <view class="list-panel">
-    <text class="section-title">已核实点位</text>
-    <picker range="{{speciesNames}}" value="{{selectedSpeciesIndex}}" bindchange="onSpeciesChange">
-      <view class="filter-box">{{speciesNames[selectedSpeciesIndex]}}</view>
-    </picker>
+  <view class="list-panel {{panelCollapsed ? 'collapsed' : ''}}">
+    <view class="panel-handle" hover-class="hover-tap" bindtap="togglePanel">
+      <view class="handle-bar"></view>
+    </view>
 
-    <view
-      class="report-row"
-      wx:for="{{reports}}"
-      wx:key="id"
-      data-id="{{item.speciesId}}"
-      bindtap="openDetail"
-    >
-      <view>
-        <text class="report-name">{{item.aiTop1}}</text>
-        <text class="muted">{{item.address}}</text>
+    <view class="panel-header">
+      <text class="section-title">已核实点位</text>
+      <view class="panel-toggle" hover-class="hover-tap" bindtap="togglePanel">
+        <view class="arrow {{panelCollapsed ? '' : 'arrow-down'}}"></view>
       </view>
-      <text class="status-tag">已核实</text>
+    </view>
+
+    <view class="panel-body {{panelCollapsed ? 'hidden' : ''}}">
+      <picker range="{{speciesNames}}" value="{{selectedSpeciesIndex}}" bindchange="onSpeciesChange">
+        <view class="filter-box" hover-class="hover-tap">{{speciesNames[selectedSpeciesIndex]}}</view>
+      </picker>
+
+      <view
+        class="report-row"
+        hover-class="hover-bg"
+        wx:for="{{reports}}"
+        wx:key="id"
+        data-id="{{item.speciesId}}"
+        bindtap="openDetail"
+      >
+        <view>
+          <text class="report-name">{{item.aiTop1}}</text>
+          <text class="muted">{{item.address}}</text>
+        </view>
+        <text class="status-tag">已核实</text>
+      </view>
     </view>
   </view>
 </view>

@@ -44,11 +44,40 @@
   color: #305d3c;
 }
 
-.detail-block {
+.accordion-block {
+  border-bottom: 1rpx solid #ece8da;
+}
+
+.accordion-block:last-child {
+  border-bottom: 0;
+}
+
+.accordion-header {
   display: flex;
-  flex-direction: column;
-  gap: 10rpx;
-  margin-top: 24rpx;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24rpx 0;
+  cursor: pointer;
+  user-select: none;
+}
+
+.accordion-header .block-title {
+  margin-bottom: 0;
+}
+
+.accordion-body {
+  overflow: hidden;
+  transition: max-height 0.25s ease, opacity 0.2s ease;
+  max-height: 2000rpx;
+  opacity: 1;
+  padding-bottom: 20rpx;
+}
+
+.accordion-body.hidden {
+  max-height: 0;
+  opacity: 0;
+  padding-top: 0;
+  padding-bottom: 0;
 }
 
 .block-title {

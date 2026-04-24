@@ -7,3 +7,6 @@ miniprogram/.idea/
 server/uploads/*
 !server/uploads/.gitkeep
 server/data/runtime-data.json
+server/data/*.db
+server/data/*.db-shm
+server/data/*.db-wal

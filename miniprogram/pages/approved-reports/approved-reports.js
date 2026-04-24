@@ -1,60 +1,58 @@
-const api = require("../../utils/api");
+var api = require("../../utils/api");
 
 Page({
   data: {
     reports: [],
     filteredReports: [],
-    searchKeyword: ""
+    searchKeyword: "",
+    loading: true
   },
 
   onShow() {
     this.loadReports();
   },
 
+  onPullDownRefresh() {
+    this.loadReports().then(function () {
+      wx.stopPullDownRefresh();
+    });
+  },
+
   async loadReports() {
+    this.setData({ loading: true });
     try {
-      const res = await api.getReports("approved");
-      this.setData({
-        reports: res.items
-      });
+      var res = await api.getReports("approved");
+      this.setData({ reports: res.items || [], loading: false });
       this.applyFilter();
     } catch (error) {
-      wx.showToast({
-        title: "记录加载失败",
-        icon: "none"
-      });
+      this.setData({ loading: false });
+      wx.showToast({ title: "记录加载失败", icon: "none" });
     }
   },
 
   onSearchInput(event) {
-    this.setData({
-      searchKeyword: event.detail.value || ""
-    });
+    this.setData({ searchKeyword: event.detail.value || "" });
     this.applyFilter();
   },
 
   applyFilter() {
-    const keyword = this.data.searchKeyword.trim().toLowerCase();
-    const filteredReports = this.data.reports.filter((item) => {
+    var keyword = this.data.searchKeyword.trim().toLowerCase();
+    var filteredReports = this.data.reports.filter(function (item) {
       return (
         !keyword ||
-        item.aiTop1.toLowerCase().includes(keyword) ||
-        item.address.toLowerCase().includes(keyword) ||
-        (item.remark || "").toLowerCase().includes(keyword)
+        (item.aiTop1 || "").toLowerCase().indexOf(keyword) >= 0 ||
+        (item.address || "").toLowerCase().indexOf(keyword) >= 0 ||
+        (item.remark || "").toLowerCase().indexOf(keyword) >= 0
       );
     });
-
-    this.setData({
-      filteredReports
-    });
+    this.setData({ filteredReports: filteredReports });
   },
 
-  previewImage(event) {
-    const { url } = event.currentTarget.dataset;
-    if (!url) return;
-    wx.previewImage({
-      current: url,
-      urls: [url]
+  openDetail(e) {
+    var id = e.currentTarget.dataset.id;
+    if (!id || id === "null" || id === "undefined") return;
+    wx.navigateTo({
+      url: "/pages/detail/detail?id=" + id
     });
   }
 });

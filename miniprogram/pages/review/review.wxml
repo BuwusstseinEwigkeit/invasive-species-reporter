@@ -4,8 +4,15 @@
     <text class="muted">这里是演示版人工审核入口。只有审核通过的记录才会进入地图展示。</text>
   </view>
 
-  <view class="card empty-card" wx:if="{{!reports.length}}">
-    <text class="muted">当前没有待审核记录。</text>
+  <view class="loading-card" wx:if="{{loading}}">
+    <view class="skeleton-line w80"></view>
+    <view class="skeleton-line w60"></view>
+    <view class="skeleton-line w70"></view>
+  </view>
+
+  <view class="empty-state" wx:elif="{{!loading && !reports.length}}">
+    <text class="empty-icon">📋</text>
+    <text class="muted">当前没有待审核记录</text>
   </view>
 
   <view class="card review-card" wx:for="{{reports}}" wx:key="id">
@@ -15,10 +22,15 @@
     <text class="muted">备注：{{item.remark || "无"}}</text>
 
     <view class="candidate-wrap" wx:if="{{item.aiCandidates && item.aiCandidates.length}}">
-      <text class="field-label">AI 候选</text>
-      <view class="candidate-row" wx:for="{{item.aiCandidates}}" wx:key="speciesId">
-        <text class="muted">{{item.speciesName}}</text>
-        <text class="muted">{{item.confidence}}</text>
+      <view class="candidate-header" hover-class="hover-tap" data-index="{{index}}" bindtap="toggleCandidates">
+        <text class="field-label">AI 候选</text>
+        <view class="arrow {{collapsedCandidates.indexOf(index) >= 0 ? '' : 'arrow-down'}}"></view>
+      </view>
+      <view class="collapse-body {{collapsedCandidates.indexOf(index) >= 0 ? 'hidden' : ''}}">
+        <view class="candidate-row" wx:for="{{item.aiCandidates}}" wx:key="speciesId">
+          <text class="muted">{{item.speciesName}}</text>
+          <text class="muted">{{item.confidence}}</text>
+        </view>
       </view>
     </view>
 
@@ -40,13 +52,14 @@
         data-index="{{index}}"
         bindchange="onSpeciesChange"
       >
-        <view class="picker-box">{{speciesNames[item.reviewSpeciesIndex]}}</view>
+        <view class="picker-box" hover-class="hover-tap">{{speciesNames[item.reviewSpeciesIndex]}}</view>
       </picker>
     </view>
 
     <view class="review-actions">
       <button
         class="primary-button"
+        hover-class="hover-scale"
         data-id="{{item.id}}"
         data-index="{{index}}"
         data-action="approved"
@@ -56,13 +69,30 @@
       </button>
       <button
         class="ghost-button"
+        hover-class="hover-scale"
         data-id="{{item.id}}"
         data-index="{{index}}"
         data-action="rejected"
-        bindtap="submitReview"
+        bindtap="confirmReject"
       >
         驳回
       </button>
     </view>
+  </view>
+</view>
+
+<view class="modal-mask" wx:if="{{showRejectModal}}" bindtap="closeRejectModal"></view>
+<view class="modal-card" wx:if="{{showRejectModal}}">
+  <text class="section-title">驳回原因</text>
+  <textarea
+    class="reject-input"
+    maxlength="200"
+    placeholder="请说明驳回原因（选填）"
+    value="{{rejectReason}}"
+    bindinput="onRejectInput"
+  />
+  <view class="modal-actions">
+    <button class="ghost-button" hover-class="hover-scale" bindtap="closeRejectModal">取消</button>
+    <button class="primary-button" hover-class="hover-scale" data-id="{{rejectReportId}}" data-index="{{rejectReportIndex}}" data-action="rejected" bindtap="submitReview">确认驳回</button>
   </view>
 </view>

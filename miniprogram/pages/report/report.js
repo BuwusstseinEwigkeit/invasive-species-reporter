@@ -21,7 +21,12 @@ Page({
     isRecognizing: false,
     searchKeyword: "",
     filteredSpeciesNames: ["暂不选择"],
-    filteredSpeciesIndexes: [0]
+    filteredSpeciesIndexes: [0],
+    candidatesCollapsed: false
+  },
+
+  toggleCandidates() {
+    this.setData({ candidatesCollapsed: !this.data.candidatesCollapsed });
   },
 
   onShow() {
@@ -325,7 +330,7 @@ Page({
       });
 
       setTimeout(() => {
-        wx.navigateBack();
+        wx.switchTab({ url: "/pages/home/home" });
       }, 700);
     } catch (error) {
       wx.showToast({

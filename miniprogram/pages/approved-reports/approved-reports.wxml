@@ -1,5 +1,6 @@
 <view class="page-shell">
-  <view class="card toolbar-card">
+
+  <view class="toolbar-card">
     <input
       class="search-input"
       placeholder="搜索已核实物种、地点或备注"
@@ -8,24 +9,32 @@
     />
   </view>
 
-  <view class="card empty-card" wx:if="{{!filteredReports.length}}">
-    <text class="muted">没有匹配的已核实记录。</text>
+  <view class="loading-card" wx:if="{{loading}}">
+    <view class="skeleton-line w80"></view>
+    <view class="skeleton-line w60"></view>
+    <view class="skeleton-line w70"></view>
   </view>
 
-  <view class="card report-card" wx:for="{{filteredReports}}" wx:key="id">
-    <text class="report-title">{{item.aiTop1}}</text>
-    <text class="muted">{{item.address}}</text>
-    <text class="muted">{{item.createdAt}}</text>
-    <text class="status-line">状态：{{item.status}}</text>
-    <text class="muted" wx:if="{{item.aiScore}}">AI 置信度：{{item.aiScore}}</text>
-    <image
-      wx:if="{{item.imageUrl}}"
-      class="report-image"
-      src="{{item.imageUrl}}"
-      mode="aspectFill"
-      lazy-load
-      data-url="{{item.imageUrl}}"
-      bindtap="previewImage"
-    />
+  <view wx:elif="{{!filteredReports.length}}" class="empty-state">
+    <text class="empty-icon">✅</text>
+    <text class="muted">暂无已核实记录</text>
+  </view>
+
+  <view class="report-list" wx:else>
+    <view
+      class="report-card"
+      hover-class="hover-bg"
+      wx:for="{{filteredReports}}"
+      wx:key="id"
+      data-id="{{item.speciesId}}"
+      bindtap="openDetail"
+    >
+      <view class="report-main">
+        <text class="report-ai">{{item.aiTop1 || "未识别"}}</text>
+        <text class="muted">{{item.address || "未知位置"}}</text>
+        <text class="muted time">{{item.createdAt}}</text>
+      </view>
+      <text class="status-tag">已核实</text>
+    </view>
   </view>
 </view>

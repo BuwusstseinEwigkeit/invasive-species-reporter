@@ -1,24 +1,98 @@
-const app = getApp();
+var app = getApp();
 
-function request(path, options = {}) {
-  return new Promise((resolve, reject) => {
+function getToken() {
+  try {
+    var stored = wx.getStorageSync("auth_token");
+    if (stored) return stored;
+  } catch (_e) { /* ignore */ }
+
+  try {
+    return app.globalData.authToken || "";
+  } catch (_e) {
+    return "";
+  }
+}
+
+function setToken(token) {
+  try {
+    app.globalData.authToken = token;
+    wx.setStorageSync("auth_token", token);
+  } catch (_e) { /* ignore */ }
+}
+
+function clearToken() {
+  try {
+    app.globalData.authToken = "";
+    wx.removeStorageSync("auth_token");
+  } catch (_e) { /* ignore */ }
+}
+
+/**
+ * Convert a relative image URL to an absolute URL.
+ * URLs already starting with http[s] pass through.
+ */
+function resolveImageUrl(url) {
+  if (!url) return "";
+  if (url.indexOf("http://") === 0 || url.indexOf("https://") === 0) return url;
+  var full = (app.globalData.apiBaseUrl || "") + url;
+  console.log("[api] resolveImageUrl:", url, "→", full);
+  return full;
+}
+
+/**
+ * Download a server image to a local temp file so it can be displayed
+ * inside <image> on 真机调试 (WeChat blocks HTTP image URLs in <image> src).
+ * Returns the local temp file path, or "" on failure.
+ */
+function downloadImage(url) {
+  return new Promise(function (resolve) {
+    var fullUrl = resolveImageUrl(url);
+    if (!fullUrl) {
+      console.log("[api] downloadImage: empty url, skipping");
+      resolve("");
+      return;
+    }
+    console.log("[api] downloadImage: downloading", fullUrl);
+    wx.downloadFile({
+      url: fullUrl,
+      success: function (res) {
+        console.log("[api] downloadImage: status=" + res.statusCode + ", temp=" + (res.tempFilePath || "(none)"));
+        if (res.statusCode === 200) {
+          resolve(res.tempFilePath);
+        } else {
+          resolve("");
+        }
+      },
+      fail: function (err) {
+        console.log("[api] downloadImage: FAIL", JSON.stringify(err));
+        resolve("");
+      }
+    });
+  });
+}
+
+function request(path, options) {
+  options = options || {};
+  return new Promise(function (resolve, reject) {
+    var headers = { "content-type": "application/json" };
+    var token = getToken();
+    if (token) {
+      headers["Authorization"] = "Bearer " + token;
+    }
     wx.request({
-      url: `${app.globalData.apiBaseUrl}${path}`,
+      url: (app.globalData.apiBaseUrl || "") + path,
       method: options.method || "GET",
       data: options.data || {},
-      timeout: options.timeout || 6000,
-      header: {
-        "content-type": "application/json"
-      },
-      success: (res) => {
+      timeout: options.timeout || 15000,
+      header: headers,
+      success: function (res) {
         if (res.statusCode >= 200 && res.statusCode < 300) {
           resolve(res.data);
           return;
         }
-
-        reject(new Error((res.data && res.data.message) || `HTTP ${res.statusCode}`));
+        reject(new Error((res.data && res.data.message) || "HTTP " + res.statusCode));
       },
-      fail: (error) => {
+      fail: function (error) {
         reject(error);
       }
     });
@@ -26,21 +100,19 @@ function request(path, options = {}) {
 }
 
 function uploadImage(filePath) {
-  return new Promise((resolve, reject) => {
+  return new Promise(function (resolve, reject) {
     wx.uploadFile({
-      url: `${app.globalData.apiBaseUrl}/api/uploads`,
-      filePath,
+      url: (app.globalData.apiBaseUrl || "") + "/api/uploads",
+      filePath: filePath,
       name: "image",
-      success: (res) => {
+      success: function (res) {
         try {
-          const data = JSON.parse(res.data);
-
+          var data = JSON.parse(res.data);
           if (res.statusCode >= 200 && res.statusCode < 300) {
             resolve(data);
             return;
           }
-
-          reject(new Error((data && data.message) || `HTTP ${res.statusCode}`));
+          reject(new Error((data && data.message) || "HTTP " + res.statusCode));
         } catch (error) {
           reject(error);
         }
@@ -50,18 +122,38 @@ function uploadImage(filePath) {
   });
 }
 
+function login(username, password) {
+  return request("/api/auth/login", {
+    method: "POST",
+    data: { username: username, password: password }
+  }).then(function (res) {
+    if (res.item && res.item.token) {
+      setToken(res.item.token);
+    }
+    return res;
+  });
+}
+
+function ensureReviewerLogin() {
+  var token = getToken();
+  if (token) {
+    // Already have a token, verify it's still valid by checking role
+    return Promise.resolve();
+  }
+  // Auto-login with demo reviewer account
+  return login("reviewer", "review123");
+}
+
 function startRecognition(fileId) {
   return request("/api/recognitions", {
     method: "POST",
-    data: {
-      fileId
-    },
+    data: { fileId: fileId },
     timeout: 10000
   });
 }
 
 function getRecognition(jobId) {
-  return request(`/api/recognitions/${jobId}`, {
+  return request("/api/recognitions/" + jobId, {
     timeout: 10000
   });
 }
@@ -75,36 +167,127 @@ function getSpecies() {
 }
 
 function getSpeciesDetail(id) {
-  return request(`/api/species/${id}`);
+  return request("/api/species/" + id);
 }
 
 function getReports(status) {
-  const query = status ? `?status=${status}` : "";
-  return request(`/api/reports${query}`);
+  var query = status ? "?status=" + status : "";
+  return request("/api/reports" + query);
 }
 
 function createReport(data) {
   return request("/api/reports", {
     method: "POST",
-    data
+    data: data
   });
 }
 
 function reviewReport(id, data) {
-  return request(`/api/reports/${id}/review`, {
-    method: "POST",
-    data
+  // Ensure auth before reviewing
+  return ensureReviewerLogin().then(function () {
+    return request("/api/reports/" + id + "/review", {
+      method: "POST",
+      data: data
+    });
   });
 }
 
+function register(username, password) {
+  return request("/api/auth/register", {
+    method: "POST",
+    data: { username: username, password: password }
+  }).then(function (res) {
+    if (res.item && res.item.token) {
+      setToken(res.item.token);
+    }
+    return res;
+  });
+}
+
+function getMyUserId() {
+  var token = getToken();
+  if (!token) return "";
+  try {
+    var parts = token.split(".");
+    if (parts.length === 3) {
+      var payload = JSON.parse(decodeURIComponent(parts[1].replace(/-/g, "+").replace(/_/g, "/").split("").map(function (c) { return "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2); }).join("")));
+      return payload.userId || "";
+    }
+  } catch (_e) { /* ignore */ }
+  return "";
+}
+
+function getMyUsername() {
+  var token = getToken();
+  if (!token) return "";
+  try {
+    var parts = token.split(".");
+    if (parts.length === 3) {
+      var payload = JSON.parse(decodeURIComponent(parts[1].replace(/-/g, "+").replace(/_/g, "/").split("").map(function (c) { return "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2); }).join("")));
+      return payload.username || "";
+    }
+  } catch (_e) { /* ignore */ }
+  return "";
+}
+
+function getMyRole() {
+  var token = getToken();
+  if (!token) return "";
+  try {
+    var parts = token.split(".");
+    if (parts.length === 3) {
+      var payload = JSON.parse(decodeURIComponent(parts[1].replace(/-/g, "+").replace(/_/g, "/").split("").map(function (c) { return "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2); }).join("")));
+      return payload.role || "";
+    }
+  } catch (_e) { /* ignore */ }
+  return "";
+}
+
+// --- Points ---
+
+function getPoints(userId) {
+  return request("/api/points/" + userId);
+}
+
+// --- Shop ---
+
+function getProducts() {
+  return request("/api/shop/products");
+}
+
+function purchaseProduct(productId) {
+  return request("/api/shop/purchase", {
+    method: "POST",
+    data: { productId: productId }
+  });
+}
+
+function getPurchases(userId) {
+  return request("/api/shop/purchases/" + userId);
+}
+
 module.exports = {
-  uploadImage,
-  startRecognition,
-  getRecognition,
-  getStats,
-  getSpecies,
-  getSpeciesDetail,
-  getReports,
-  createReport,
-  reviewReport
+  uploadImage: uploadImage,
+  startRecognition: startRecognition,
+  getRecognition: getRecognition,
+  getStats: getStats,
+  getSpecies: getSpecies,
+  getSpeciesDetail: getSpeciesDetail,
+  getReports: getReports,
+  createReport: createReport,
+  reviewReport: reviewReport,
+  login: login,
+  register: register,
+  setToken: setToken,
+  getToken: getToken,
+  clearToken: clearToken,
+  getMyUserId: getMyUserId,
+  getMyUsername: getMyUsername,
+  getMyRole: getMyRole,
+  getPoints: getPoints,
+  getProducts: getProducts,
+  purchaseProduct: purchaseProduct,
+  getPurchases: getPurchases,
+  resolveImageUrl: resolveImageUrl,
+  downloadImage: downloadImage
 };

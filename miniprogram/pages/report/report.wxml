@@ -4,7 +4,7 @@
 
     <view class="field">
       <text class="field-label">现场图片</text>
-      <button class="ghost-button" bindtap="chooseImage">选择并上传图片</button>
+      <button class="ghost-button" hover-class="hover-scale" bindtap="chooseImage">选择并上传图片</button>
       <image wx:if="{{localImageUrl}}" class="preview-image" src="{{localImageUrl}}" mode="aspectFill" lazy-load />
       <text class="muted" wx:if="{{isUploading}}">图片上传中...</text>
       <text class="muted" wx:if="{{uploadedImageUrl && !isUploading}}">图片已上传到服务端</text>
@@ -13,25 +13,31 @@
 
     <view class="field">
       <text class="field-label">发现位置</text>
-      <button class="ghost-button" bindtap="chooseLocation">选择位置</button>
+      <button class="ghost-button" hover-class="hover-scale" bindtap="chooseLocation">选择位置</button>
       <text class="muted" wx:if="{{address}}">{{address}}</text>
     </view>
 
     <view class="field ai-card">
-      <text class="field-label">AI 初筛结果</text>
+      <view class="ai-header" hover-class="hover-tap" bindtap="toggleCandidates">
+        <text class="field-label">AI 初筛结果</text>
+        <view class="arrow {{candidatesCollapsed ? '' : 'arrow-down'}}"></view>
+      </view>
       <text class="ai-name">{{aiTop1}}</text>
       <text class="muted" wx:if="{{isRecognizing}}">后台识别中，你可以继续填写位置和备注。</text>
       <text class="muted" wx:if="{{aiScore}}">置信度：{{aiScore}}</text>
       <text class="muted" wx:if="{{aiSummary}}">{{aiSummary}}</text>
-      <view class="candidate-list" wx:if="{{aiCandidates.length}}">
-        <view class="candidate-row" wx:for="{{aiCandidates}}" wx:key="speciesId">
-          <text class="muted">{{item.speciesName}}</text>
-          <text class="muted">{{item.confidence}}</text>
+      <view class="collapse-body {{candidatesCollapsed ? 'hidden' : ''}}">
+        <view class="candidate-list" wx:if="{{aiCandidates.length}}">
+          <view class="candidate-row" wx:for="{{aiCandidates}}" wx:key="speciesId">
+            <text class="muted">{{item.speciesName}}</text>
+            <text class="muted">{{item.confidence}}</text>
+          </view>
         </view>
       </view>
       <button
         wx:if="{{uploadedFileId && !isRecognizing}}"
         class="ghost-button retry-button"
+        hover-class="hover-scale"
         bindtap="retryRecognition"
       >
         重新识别
@@ -47,7 +53,7 @@
         bindinput="onSearchInput"
       />
       <picker range="{{filteredSpeciesNames}}" value="0" bindchange="onSpeciesChange">
-        <view class="picker-box">
+        <view class="picker-box" hover-class="hover-tap">
           {{selectedSpeciesIndex > 0 ? speciesNames[selectedSpeciesIndex] : "暂不选择"}}
         </view>
       </picker>
@@ -64,6 +70,6 @@
       />
     </view>
 
-    <button class="primary-button submit-button" bindtap="submitReport">提交审核</button>
+    <button class="primary-button submit-button" hover-class="hover-scale" bindtap="submitReport">提交审核</button>
   </view>
 </view>

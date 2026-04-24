@@ -1,0 +1,93 @@
+<view class="page-shell">
+
+  <!-- Not logged in -->
+  <view class="card login-prompt" wx:if="{{!loggedIn}}">
+    <text class="prompt-icon">👤</text>
+    <text class="section-title">登录后查看更多</text>
+    <text class="muted prompt-desc">登录后可查看积分、管理上报记录，还能兑换奖励。</text>
+    <button class="primary-button" hover-class="hover-scale" bindtap="goLogin">登录 / 注册</button>
+  </view>
+
+  <!-- Logged in -->
+  <view wx:else>
+    <!-- User card -->
+    <view class="card user-card">
+      <view class="user-avatar">{{username.slice(0, 1).toUpperCase()}}</view>
+      <view class="user-info">
+        <text class="user-name">{{username}}</text>
+        <text class="user-role" wx:if="{{role === 'reviewer' || role === 'admin'}}">
+          {{role === 'admin' ? '管理员' : '审核员'}}
+        </text>
+        <text class="user-role muted" wx:else>普通用户</text>
+      </view>
+      <view class="user-edit" hover-class="hover-tap" bindtap="goMyDetail">
+        <text class="muted">›</text>
+      </view>
+    </view>
+
+    <!-- Points card -->
+    <view class="card points-card">
+      <text class="points-number">{{points}}</text>
+      <text class="muted points-label">当前积分</text>
+      <view class="points-actions">
+        <button class="ghost-button" hover-class="hover-scale" bindtap="goShop">积分商城</button>
+      </view>
+    </view>
+
+    <!-- Recent points history -->
+    <view class="card" wx:if="{{pointsLogs.length > 0}}">
+      <view class="section-header" hover-class="hover-tap" bindtap="toggleLogs">
+        <text class="section-title">积分记录</text>
+        <view class="arrow {{logsCollapsed ? '' : 'arrow-down'}}"></view>
+      </view>
+      <view class="collapse-body {{logsCollapsed ? 'hidden' : ''}}">
+        <view class="log-row" wx:for="{{pointsLogs}}" wx:key="id">
+          <view class="log-left">
+            <text class="log-action">
+              {{item.action === 'report_submit' ? '上报奖励' : ''}}
+              {{item.action === 'report_approved' ? '审核通过奖励' : ''}}
+              {{item.action === 'purchase' ? '兑换商品' : ''}}
+              {{item.action !== 'report_submit' && item.action !== 'report_approved' && item.action !== 'purchase' ? item.action : ''}}
+            </text>
+            <text class="muted log-time">{{item.createdAt}}</text>
+          </view>
+          <text class="log-amount {{item.amount > 0 ? 'positive' : 'negative'}}">
+            {{item.amount > 0 ? '+' : ''}}{{item.amount}}
+          </text>
+        </view>
+      </view>
+    </view>
+
+    <!-- Menu -->
+    <view class="card menu-card">
+      <view class="menu-item" hover-class="hover-bg" bindtap="goMyReports">
+        <text class="menu-icon">📋</text>
+        <text class="menu-label">我的上报</text>
+        <text class="menu-arrow">›</text>
+      </view>
+      <view class="menu-item" hover-class="hover-bg" bindtap="goApprovedReports">
+        <text class="menu-icon">✅</text>
+        <text class="menu-label">已核实记录</text>
+        <text class="menu-arrow">›</text>
+      </view>
+      <view class="menu-item" hover-class="hover-bg" bindtap="goShop">
+        <text class="menu-icon">🎁</text>
+        <text class="menu-label">积分商城</text>
+        <text class="menu-arrow">›</text>
+      </view>
+      <view class="menu-item" hover-class="hover-bg" wx:if="{{role === 'reviewer' || role === 'admin'}}" bindtap="goReview">
+        <text class="menu-icon">🔍</text>
+        <text class="menu-label">审核台</text>
+        <text class="menu-arrow">›</text>
+      </view>
+    </view>
+
+    <!-- Logout -->
+    <view class="card logout-card">
+      <view class="menu-item" hover-class="hover-bg" bindtap="onLogout">
+        <text class="menu-icon">🚪</text>
+        <text class="menu-label logout-text">退出登录</text>
+      </view>
+    </view>
+  </view>
+</view>

@@ -1,5 +1,6 @@
 <view class="page-shell">
-  <view class="card toolbar-card">
+
+  <view class="toolbar-card">
     <input
       class="search-input"
       placeholder="搜索物种、地点或备注"
@@ -7,28 +8,39 @@
       bindinput="onSearchInput"
     />
     <picker range="{{statusOptions}}" value="{{selectedStatusIndex}}" bindchange="onStatusChange">
-      <view class="filter-box">{{statusOptions[selectedStatusIndex]}}</view>
+      <view class="filter-box" hover-class="hover-tap">{{statusOptions[selectedStatusIndex]}}</view>
     </picker>
   </view>
 
-  <view class="card empty-card" wx:if="{{!filteredReports.length}}">
-    <text class="muted">没有匹配的上报记录。</text>
+  <view class="loading-card" wx:if="{{loading}}">
+    <view class="skeleton-line w80"></view>
+    <view class="skeleton-line w60"></view>
+    <view class="skeleton-line w70"></view>
+    <view class="skeleton-line w50"></view>
   </view>
 
-  <view class="card report-card" wx:for="{{filteredReports}}" wx:key="id">
-    <text class="report-title">{{item.aiTop1}}</text>
-    <text class="muted">{{item.address}}</text>
-    <text class="muted">{{item.createdAt}}</text>
-    <text class="status-line">状态：{{item.status}}</text>
-    <text class="muted" wx:if="{{item.aiScore}}">AI 置信度：{{item.aiScore}}</text>
-    <image
-      wx:if="{{item.imageUrl}}"
-      class="report-image"
-      src="{{item.imageUrl}}"
-      mode="aspectFill"
-      lazy-load
-      data-url="{{item.imageUrl}}"
-      bindtap="previewImage"
-    />
+  <view wx:elif="{{!filteredReports.length}}" class="empty-state">
+    <text class="empty-icon">📋</text>
+    <text class="muted">没有匹配的上报记录</text>
+  </view>
+
+  <view class="report-list" wx:else>
+    <view
+      class="report-card"
+      hover-class="hover-bg"
+      wx:for="{{filteredReports}}"
+      wx:key="id"
+      data-id="{{item.speciesId}}"
+      bindtap="openDetail"
+    >
+      <view class="report-main">
+        <text class="report-ai">{{item.aiTop1 || "未识别"}}</text>
+        <text class="muted">{{item.address || "未知位置"}}</text>
+        <text class="muted time">{{item.createdAt}}</text>
+      </view>
+      <text class="status-tag tag-{{item.status}}">
+        {{item.status === 'approved' ? '已通过' : item.status === 'rejected' ? '已驳回' : '待审核'}}
+      </text>
+    </view>
   </view>
 </view>

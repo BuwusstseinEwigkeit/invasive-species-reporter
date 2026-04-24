@@ -42,6 +42,14 @@
   border-radius: 20rpx;
 }
 
+.ai-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+}
+
 .ai-name {
   font-size: 30rpx;
   font-weight: 700;
