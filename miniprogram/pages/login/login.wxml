@@ -1,6 +1,6 @@
 <view class="page-shell login-shell">
   <view class="card login-card">
-    <image class="login-hero-img" src="/images/login-hero.png" mode="aspectFill" />
+    <image class="login-hero-img" src="/images/login-hero.jpg" mode="aspectFill" />
     <text class="login-brand">外来物种哨点</text>
     <text class="login-subtitle">公众参与式监测平台</text>
 
