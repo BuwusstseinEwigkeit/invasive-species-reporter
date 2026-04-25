@@ -1,3 +1,4 @@
 {
-  "navigationBarTitleText": "外来物种哨点"
+  "navigationBarTitleText": "外来物种哨点",
+  "enablePullDownRefresh": true
 }

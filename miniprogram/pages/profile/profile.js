@@ -138,7 +138,15 @@ Page({
           api.exportCsv().then(function (path) {
             wx.hideLoading();
             wx.showToast({ title: "导出成功", icon: "success" });
-          }).catch(function () {
+            // Show the file path so user knows where it is
+            if (path) {
+              wx.showModal({
+                title: "文件已保存",
+                content: "文件路径：" + path + "\n\n您可以在微信文件管理中找到该文件。",
+                showCancel: false
+              });
+            }
+          }).catch(function (err) {
             wx.hideLoading();
             wx.showToast({ title: "导出失败，请重试", icon: "none" });
           });

@@ -52,28 +52,27 @@ Page({
       var statsRes = results[0];
       var speciesRes = results[1];
 
-      // Start with badge fallback (no avatar), download images async
-      var species = (speciesRes.items || []).map(function (s) {
-        s.avatar = "";
-        return s;
-      });
-
       this.setData({
         stats: statsRes.item,
-        species: species
+        species: speciesRes.items || []
       });
 
-      // Download thumbnails asynchronously — one at a time to avoid flooding
+      // Download thumbnails asynchronously one at a time
       var self = this;
       var items = speciesRes.items || [];
       function downloadNext(i) {
         if (i >= items.length) return;
         var s = items[i];
-        if (s.avatar) {
-          api.downloadImage(s.avatar).then(function (localPath) {
+        if (s.avatar && !s.avatar.startsWith("http")) {
+          // Convert relative path to absolute URL
+          var baseUrl = app.globalData.apiBaseUrl || "";
+          var imgUrl = s.avatar.startsWith("/") ? baseUrl + s.avatar : baseUrl + "/" + s.avatar;
+          api.downloadImage(imgUrl).then(function (localPath) {
             if (localPath) {
               self.setData({ ["species[" + i + "].avatar"]: localPath });
             }
+            downloadNext(i + 1);
+          }).catch(function() {
             downloadNext(i + 1);
           });
         } else {
@@ -145,5 +144,10 @@ Page({
     wx.navigateTo({
       url: "/pages/detail/detail?id=" + id
     });
+  },
+
+  onPullDownRefresh() {
+    this.loadData();
+    wx.stopPullDownRefresh();
   }
 });
