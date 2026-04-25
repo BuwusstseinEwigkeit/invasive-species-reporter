@@ -1,5 +1,14 @@
 <view class="page-shell">
-  <view class="card form-card">
+  <!-- 上报成功全屏插画 -->
+  <view class="success-overlay" wx:if="{{submitSuccess}}">
+    <image class="success-img" src="/images/report-success.png" mode="aspectFit" />
+    <text class="success-title">提交成功</text>
+    <text class="success-desc">感谢您的生态线索，审核员将在24小时内完成审核。</text>
+    <button class="primary-button success-btn" hover-class="hover-scale" bindtap="goHome">返回首页</button>
+  </view>
+
+  <!-- 正常表单 -->
+  <view class="card form-card" wx:else>
     <text class="section-title">创建疑似线索</text>
 
     <view class="field">

@@ -103,3 +103,38 @@
 .submit-button {
   margin-top: 12rpx;
 }
+
+/* --- Success overlay --- */
+.success-overlay {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background: linear-gradient(180deg, #f7f4ea 0%, #eef4eb 100%);
+  padding: 60rpx 40rpx;
+  gap: 32rpx;
+}
+
+.success-img {
+  width: 480rpx;
+  height: 360rpx;
+}
+
+.success-title {
+  font-size: 48rpx;
+  font-weight: 800;
+  color: #284d34;
+}
+
+.success-desc {
+  font-size: 28rpx;
+  color: #6b786b;
+  text-align: center;
+  line-height: 1.6;
+}
+
+.success-btn {
+  width: 360rpx;
+  margin-top: 16rpx;
+}

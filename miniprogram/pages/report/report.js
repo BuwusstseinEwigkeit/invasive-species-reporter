@@ -19,6 +19,7 @@ Page({
     selectedSpeciesIndex: 0,
     isUploading: false,
     isRecognizing: false,
+    submitSuccess: false,
     searchKeyword: "",
     filteredSpeciesNames: ["暂不选择"],
     filteredSpeciesIndexes: [0],
@@ -346,7 +347,7 @@ Page({
       });
 
       setTimeout(() => {
-        wx.switchTab({ url: "/pages/home/home" });
+        this.setData({ submitSuccess: true });
       }, 700);
     } catch (error) {
       wx.showToast({
@@ -354,5 +355,10 @@ Page({
         icon: "none"
       });
     }
+  },
+
+  goHome() {
+    this.setData({ submitSuccess: false });
+    wx.switchTab({ url: "/pages/home/home" });
   }
 });
