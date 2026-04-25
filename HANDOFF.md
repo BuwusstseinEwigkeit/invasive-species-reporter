@@ -45,7 +45,56 @@
 - Do not remove async job flow; front-end already depends on it.
 - Database schema is in `server/lib/database.js` → `initSchema()`
 
-## Completed (v0.6.0)
+## Completed (v0.6.1)
+
+1. ✅ **API 错误格式统一化** — 所有端点使用 `sendError(res, error, code)` / `sendSuccess(res, data, statusCode)` 统一格式
+2. ✅ **前端全局错误提示** — request()/uploadImage() 失败时自动弹出 Toast，app.js 增加 `wx.onError` 全局异常捕获
+3. ✅ **HTTPS 与生产配置** — 新建 `deploy/` 目录（nginx.conf, https-server.js, deploy.sh）
+4. ✅ **物种知识图谱** — species 表增加 `relations` 字段，详情页新增生态关系图谱卡片
+5. ✅ **上报数据导出 CSV** — 新增 `GET /api/reports/export/csv` 端点，含 BOM 的 UTF-8 CSV（Excel 兼容）
+6. ✅ **消息通知系统** — 新增 `notifications` 表，审核通过/驳回时自动创建通知，`GET /api/notifications/:userId`、`POST /api/notifications/:id/read`、`POST /api/notifications/:userId/read-all`
+7. ✅ **Python 识别微服务** — `python-service/app.py` 支持 JSON/base64 和 multipart 两种输入格式，mock 识别器始终可用
+8. ✅ **MiniMax VL-3 识别提供商** — 新增 `recognizeWithMiniMax()`，性价比最高的视觉识别模型
+9. ✅ **微信登录集成** — 新增 `POST /api/auth/wx-login` 端点，`openid` 字段支持
+10. ✅ **我的上报用户过滤** — 新增 `GET /api/reports/my` 端点，JWT 鉴权后返回当前用户上报
+11. ✅ **地图热力图** — `addHeatMap` 实现，点击按钮切换显示
+12. ✅ **详情页信息增强** — species 表增加 `origin`、`control_methods` 字段，四格信息卡片 + 防治方法折叠面板
+13. ✅ **图片压缩选项** — 上报页面新增高清90%/标准60%/极限30% 选择器
+14. ✅ **Moonshot/Kimi 识别后备** — 新增 `recognizeWithMoonshot()`，配置 `MOONSHOT_API_KEY` 启用
+
+## 识别服务链验证 (v0.6.1)
+
+✅ **识别链状态**:
+- MiniMax (primary): `MINIMAX_API_KEY` 已配置
+- Zhipu (cloud fallback): `ZHIPU_API_KEY` 已配置  
+- Moonshot (cloud fallback 2): 可通过 `MOONSHOT_API_KEY` 启用
+- Python 微服务: 可通过 `PYTHON_RECOGNITION_URL` 启用（当前未启用）
+- Ollama (local): 可通过 `OLLAMA_VISION_MODEL` 启用（当前未启用）
+- Mock (final fallback): ✅ 始终可用，已验证正常工作
+
+✅ **已验证功能**:
+- `POST /api/uploads` → 文件上传成功
+- `POST /api/recognitions` → 异步任务创建成功
+- `GET /api/recognitions/:jobId` → 轮询完成，返回 mock 识别结果
+
+## 自动化测试
+
+✅ **回归测试脚本**: `scripts/regression-test.sh`
+- 14 个测试用例覆盖核心功能
+- 包含健康检查、登录、CRUD、认证、文件上传等
+- 最近执行: 2026-04-25，13/14 通过（图片上传测试脚本需修复）
+
+## Recommended Next Steps
+
+1. ~~微信登录集成~~ → Done (v0.6.1)
+2. ~~添加第二识别 API 后备~~ → Done (Moonshot + Python)
+3. ~~图片压缩选项~~ → Done (v0.6.1)
+4. ~~地图热力图~~ → Done (v0.6.1)
+5. ~~通知系统~~ → Done (v0.6.1)
+6. ~~数据导出~~ → Done (v0.6.1)
+7. 生产环境 HTTPS 配置
+8. 小程序端到端测试（真机调试）
+9. 性能监控和日志系统
 
 1. ✅ **API 错误格式统一化** — 所有端点使用 `sendError(res, error, code)` / `sendSuccess(res, data, statusCode)` 统一格式，前端兼容新旧格式
 2. ✅ **前端全局错误提示** — request()/uploadImage() 失败时自动弹出 Toast，app.js 增加 `wx.onError` 全局异常捕获
