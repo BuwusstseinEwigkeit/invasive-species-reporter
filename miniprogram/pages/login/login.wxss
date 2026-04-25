@@ -1,64 +1,110 @@
 .login-shell {
   display: flex;
   justify-content: center;
-  padding-top: 80rpx;
+  padding-top: 120rpx;
+  background: linear-gradient(180deg, #f7f4ea 0%, #eef4eb 100%);
+  min-height: 100vh;
 }
 
 .login-card {
   width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 28rpx;
-  padding: 40rpx 36rpx;
+  gap: 32rpx;
+  padding: 60rpx 48rpx;
+  background: #ffffff;
+  border-radius: 32rpx;
+  margin: 0 32rpx;
+  box-shadow: 0 8rpx 40rpx rgba(48, 93, 60, 0.08);
 }
 
 .login-brand {
   display: block;
   text-align: center;
-  font-size: 48rpx;
-  font-weight: 700;
-  color: #305d3c;
+  font-size: 56rpx;
+  font-weight: 800;
+  color: #284d34;
+  letter-spacing: 2rpx;
 }
 
 .login-subtitle {
   display: block;
   text-align: center;
-  font-size: 28rpx;
+  font-size: 26rpx;
   color: #6b786b;
-  margin-bottom: 20rpx;
+  margin-bottom: 16rpx;
+  letter-spacing: 4rpx;
 }
 
 .field {
   display: flex;
   flex-direction: column;
-  gap: 14rpx;
+  gap: 12rpx;
 }
 
 .field-label {
-  font-size: 28rpx;
-  font-weight: 700;
+  font-size: 26rpx;
+  font-weight: 600;
+  color: #3d5a3d;
+  padding-left: 8rpx;
 }
 
 .login-input {
   width: 100%;
-  background: #f7f7f1;
-  border-radius: 20rpx;
+  background: #f8f9f6;
+  border: 2rpx solid #e4e8de;
+  border-radius: 16rpx;
   padding: 28rpx 24rpx;
   box-sizing: border-box;
   font-size: 30rpx;
+  transition: border-color 0.2s;
+}
+
+.login-input:focus {
+  border-color: #305d3c;
+  background: #ffffff;
 }
 
 .login-actions {
   display: flex;
   flex-direction: column;
-  gap: 16rpx;
-  margin-top: 12rpx;
+  gap: 20rpx;
+  margin-top: 16rpx;
+}
+
+.primary-button {
+  background: linear-gradient(135deg, #284d34, #305d3c);
+  color: #ffffff;
+  border-radius: 16rpx;
+  height: 96rpx;
+  font-size: 32rpx;
+  font-weight: 600;
+  border: none;
+}
+
+.primary-button::after {
+  border: none;
+}
+
+.ghost-button {
+  background: #f0f4ed;
+  color: #305d3c;
+  border-radius: 16rpx;
+  height: 96rpx;
+  font-size: 30rpx;
+  font-weight: 500;
+  border: 2rpx solid #d4ddd0;
+}
+
+.ghost-button::after {
+  border: none;
 }
 
 .login-hint {
   display: block;
   text-align: center;
-  font-size: 24rpx;
+  font-size: 22rpx;
+  color: #9e9e9e;
 }
 
 .error-text {
@@ -66,61 +112,76 @@
   text-align: center;
   color: #c0392b;
   font-size: 26rpx;
+  padding: 16rpx;
+  background: #fef2f2;
+  border-radius: 12rpx;
 }
 
 .demo-hint {
-  margin-top: 8rpx;
-  padding-top: 20rpx;
+  margin-top: 16rpx;
+  padding-top: 24rpx;
   border-top: 1rpx solid #ece8da;
   text-align: center;
   display: flex;
   flex-direction: column;
-  gap: 8rpx;
+  gap: 10rpx;
+  background: #fafaf7;
+  border-radius: 16rpx;
+  padding: 20rpx;
 }
 
 .demo-title {
   font-weight: 700;
+  color: #305d3c;
+  font-size: 24rpx;
   margin-bottom: 4rpx;
+}
+
+.demo-hint .muted {
+  font-size: 22rpx;
+  color: #6b786b;
 }
 
 /* --- WeChat login --- */
 .wx-login-section {
-  margin-top: 20rpx;
+  margin-top: 24rpx;
 }
 
 .divider-row {
   display: flex;
   align-items: center;
-  gap: 16rpx;
-  margin-bottom: 20rpx;
+  gap: 20rpx;
+  margin-bottom: 24rpx;
 }
 
 .divider-line {
   flex: 1;
   height: 2rpx;
-  background: var(--border);
+  background: #e4e8de;
 }
 
 .divider-text {
   font-size: 24rpx;
-  color: var(--muted);
+  color: #9e9e9e;
+  font-weight: 500;
 }
 
 .wx-login-button {
   width: 100%;
-  height: 88rpx;
+  height: 96rpx;
   border-radius: 16rpx;
-  background: #07c160;
+  background: linear-gradient(135deg, #07c160, #06ad56);
   color: #fff;
   font-size: 30rpx;
-  font-weight: 500;
+  font-weight: 600;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 12rpx;
   border: none;
   padding: 0;
-  line-height: 88rpx;
+  line-height: 96rpx;
+  box-shadow: 0 4rpx 16rpx rgba(7, 193, 96, 0.3);
 }
 
 .wx-login-button::after {
@@ -128,5 +189,5 @@
 }
 
 .wx-icon {
-  font-size: 36rpx;
+  font-size: 40rpx;
 }
