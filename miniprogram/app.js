@@ -16,15 +16,9 @@ function resolveApiBaseUrl() {
 
   var platform = "devtools";
   try {
-    var deviceInfo = wx.getDeviceInfo();
-    platform = (deviceInfo.platform || "").toLowerCase();
-  } catch (_e) {
-    try {
-      var systemInfo = wx.getSystemInfoSync() || {};
-      platform = (systemInfo.platform || "").toLowerCase();
-    } catch (_e2) { /* ignore */ }
-  }
-  var model = (systemInfo.model || "").toLowerCase();
+    var systemInfo = wx.getSystemInfoSync() || {};
+    platform = (systemInfo.platform || "").toLowerCase();
+  } catch (_e) { /* ignore */ }
 
   // PC devtools simulator: use localhost
   if (platform === "devtools") {
