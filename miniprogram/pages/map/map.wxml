@@ -9,11 +9,12 @@
     show-location
     bindmarkertap="onMarkerTap"
     bindcallouttap="onMarkerTap"
+    bindload="onMapLoaded"
   />
 
   <view class="map-overlay-buttons">
     <view class="heatmap-btn {{heatmapEnabled ? 'heatmap-active' : ''}}" hover-class="hover-scale" bindtap="toggleHeatmap">
-      <text class="heatmap-btn-icon">&#x1F3CA;</text>
+      <text class="heatmap-btn-icon">🔥</text>
       <text class="heatmap-btn-label">热力</text>
     </view>
   </view>

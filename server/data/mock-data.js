@@ -178,8 +178,8 @@ const reports = [
       { speciesId: "species-005", speciesName: "空心莲子草", confidence: 0.18 }
     ],
     imageUrl: "/static/species/species-001.jpg",
-    latitude: 32.0617,
-    longitude: 118.7778,
+    latitude: 31.9527,
+    longitude: 118.8927,
     address: "南京市江宁区东南大学九龙湖校区",
     remark: "体育场外围绿化带发现成片黄色花序。",
     status: "approved",
@@ -196,9 +196,9 @@ const reports = [
       { speciesId: "species-007", speciesName: "克氏原螯虾", confidence: 0.12 }
     ],
     imageUrl: "/static/species/species-002.jpg",
-    latitude: 31.8926,
-    longitude: 118.8212,
-    address: "南京市江宁区某河道边",
+    latitude: 31.9412,
+    longitude: 118.8156,
+    address: "南京市江宁区秦淮河支流",
     remark: "看到了粉红色卵块和多只成体。",
     status: "approved",
     createdAt: "2026-04-21T11:10:00.000Z"
@@ -213,8 +213,8 @@ const reports = [
       { speciesId: "species-004", speciesName: "水葫芦", confidence: 0.91 }
     ],
     imageUrl: "/static/species/species-004.jpg",
-    latitude: 32.0387,
-    longitude: 118.7512,
+    latitude: 31.9743,
+    longitude: 118.7215,
     address: "南京市江宁区百家湖",
     remark: "湖边发现成片水葫芦。",
     status: "approved",
@@ -231,8 +231,8 @@ const reports = [
       { speciesId: "species-012", speciesName: "巴西龟", confidence: 0.12 }
     ],
     imageUrl: "/static/species/species-003.jpg",
-    latitude: 32.0802,
-    longitude: 118.7928,
+    latitude: 32.0602,
+    longitude: 118.7830,
     address: "南京市玄武区玄武湖公园",
     remark: "湖边看到多只红耳龟晒太阳。",
     status: "approved",
@@ -248,8 +248,8 @@ const reports = [
       { speciesId: "species-007", speciesName: "克氏原螯虾", confidence: 0.85 }
     ],
     imageUrl: "/static/species/species-007.jpg",
-    latitude: 31.9512,
-    longitude: 118.8576,
+    latitude: 31.9815,
+    longitude: 118.8055,
     address: "南京市秦淮区秦淮河沿岸",
     remark: "河边发现小龙虾洞穴。",
     status: "pending",

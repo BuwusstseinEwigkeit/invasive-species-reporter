@@ -9,11 +9,14 @@ Page({
     loggedIn: false,
     username: "",
     statsCollapsed: false,
-    speciesCollapsed: false
+    speciesCollapsed: false,
+    scrollHeight: 300
   },
 
   toggleStats() {
     this.setData({ statsCollapsed: !this.data.statsCollapsed });
+    // Re-calculate scroll height after stats expand/collapse
+    setTimeout(this.calcScrollHeight.bind(this), 350);
   },
 
   toggleSpecies() {
@@ -23,6 +26,37 @@ Page({
   onShow() {
     this.checkLogin();
     this.loadData();
+    this.calcScrollHeight();
+  },
+
+  calcScrollHeight() {
+    var self = this;
+    wx.getSystemInfo({
+      success: function (info) {
+        var windowHeight = info.windowHeight;
+        // Sum heights of hero + stats + page padding using selector query
+        wx.createSelectorQuery()
+          .select('.hero')
+          .boundingClientRect(function (heroRect) {
+            wx.createSelectorQuery()
+              .select('.stats-card')
+              .boundingClientRect(function (statsRect) {
+                // page-shell padding: 24rpx top + 24rpx bottom = 48rpx = ~96px total
+                var pagePadding = 96;
+                var heroH = heroRect ? heroRect.height : 0;
+                var statsH = (statsRect && !self.data.statsCollapsed) ? statsRect.height : 0;
+                // tabBar is ~50px, navBar ~44px — subtract from windowHeight
+                var navBarH = info.statusBarHeight || 0;
+                // scroll area = window - hero - stats - padding - navBarEstimate
+                var scrollH = windowHeight - heroH - statsH - pagePadding - navBarH;
+                if (scrollH < 100) scrollH = windowHeight * 0.5; // fallback
+                self.setData({ scrollHeight: Math.round(scrollH) });
+              })
+              .exec();
+          })
+          .exec();
+      }
+    });
   },
 
   checkLogin() {
@@ -52,27 +86,36 @@ Page({
       var statsRes = results[0];
       var speciesRes = results[1];
 
-      this.setData({
-        stats: statsRes.item,
-        species: speciesRes.items || []
+      // Pre-resolve all avatar URLs to absolute URLs before rendering
+      var baseUrl = app.globalData.apiBaseUrl || "";
+      var resolvedItems = (speciesRes.items || []).map(function (s) {
+        var avatar = s.avatar || "";
+        if (avatar && !avatar.startsWith("http")) {
+          avatar = avatar.startsWith("/") ? baseUrl + avatar : baseUrl + "/" + avatar;
+        }
+        return Object.assign({}, s, { avatar: avatar });
       });
 
-      // Download thumbnails asynchronously one at a time
+      this.setData({
+        stats: statsRes.item,
+        species: resolvedItems
+      });
+
+      // Calculate scroll height after DOM updates
+      setTimeout(this.calcScrollHeight.bind(this), 100);
+
+      // Then download thumbnails to local temp files for offline/cached display
       var self = this;
-      var items = speciesRes.items || [];
       function downloadNext(i) {
-        if (i >= items.length) return;
-        var s = items[i];
-        if (s.avatar && !s.avatar.startsWith("http")) {
-          // Convert relative path to absolute URL
-          var baseUrl = app.globalData.apiBaseUrl || "";
-          var imgUrl = s.avatar.startsWith("/") ? baseUrl + s.avatar : baseUrl + "/" + s.avatar;
-          api.downloadImage(imgUrl).then(function (localPath) {
+        if (i >= resolvedItems.length) return;
+        var s = resolvedItems[i];
+        if (s.avatar && s.avatar.startsWith("http")) {
+          api.downloadImage(s.avatar).then(function (localPath) {
             if (localPath) {
               self.setData({ ["species[" + i + "].avatar"]: localPath });
             }
             downloadNext(i + 1);
-          }).catch(function() {
+          }).catch(function () {
             downloadNext(i + 1);
           });
         } else {

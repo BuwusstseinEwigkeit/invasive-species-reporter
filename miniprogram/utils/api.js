@@ -138,6 +138,13 @@ function login(username, password) {
   }).then(function (res) {
     if (res.item && res.item.token) {
       setToken(res.item.token);
+      // Also cache role globally for reliable cross-page access
+      try {
+        var app = getApp();
+        if (app && app.globalData) {
+          app.globalData.role = res.item.role || "";
+        }
+      } catch (_e) { /* ignore */ }
     }
     return res;
   });
@@ -213,6 +220,12 @@ function register(username, password) {
   }).then(function (res) {
     if (res.item && res.item.token) {
       setToken(res.item.token);
+      try {
+        var app = getApp();
+        if (app && app.globalData) {
+          app.globalData.role = res.item.role || "";
+        }
+      } catch (_e) { /* ignore */ }
     }
     return res;
   });
@@ -225,6 +238,12 @@ function wxLogin(code) {
   }).then(function (res) {
     if (res.item && res.item.token) {
       setToken(res.item.token);
+      try {
+        var app = getApp();
+        if (app && app.globalData) {
+          app.globalData.role = res.item.role || "";
+        }
+      } catch (_e) { /* ignore */ }
     }
     return res;
   });

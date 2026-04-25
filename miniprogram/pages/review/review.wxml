@@ -27,9 +27,9 @@
         <view class="arrow {{collapsedCandidates.indexOf(index) >= 0 ? '' : 'arrow-down'}}"></view>
       </view>
       <view class="collapse-body {{collapsedCandidates.indexOf(index) >= 0 ? 'hidden' : ''}}">
-        <view class="candidate-row" wx:for="{{item.aiCandidates}}" wx:key="speciesId">
-          <text class="muted">{{item.speciesName}}</text>
-          <text class="muted">{{item.confidence}}</text>
+        <view class="candidate-row" wx:for="{{item.aiCandidates}}" wx:key="speciesId" wx:for-item="cand">
+          <text class="muted">{{cand.speciesName}}</text>
+          <text class="muted">{{cand.confidence}}</text>
         </view>
       </view>
     </view>

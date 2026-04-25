@@ -15,14 +15,18 @@
 
     <view class="field">
       <text class="field-label">密码</text>
-      <input
-        class="login-input"
-        type="safe-password"
-        password="{{true}}"
-        placeholder="输入密码（至少4位）"
-        value="{{password}}"
-        bindinput="onPasswordInput"
-      />
+      <view class="password-wrap">
+        <input
+          class="login-input password-field {{showPassword ? '' : 'pwd-hidden'}}"
+          type="{{showPassword ? 'text' : 'password'}}"
+          placeholder="输入密码（至少4位）"
+          value="{{password}}"
+          bindinput="onPasswordInput"
+        />
+        <view class="pwd-toggle" bindtap="togglePassword">
+          <text>{{showPassword ? '🙈' : '👁'}}</text>
+        </view>
+      </view>
     </view>
 
     <view class="login-actions">
@@ -41,14 +45,14 @@
         <view class="divider-line"></view>
       </view>
       <button class="wx-login-button" hover-class="hover-scale" bindtap="onWxLogin" disabled="{{submitting}}">
-        <text class="wx-icon">&#x1F4F1;</text>
+        <text class="wx-icon">微</text>
         <text>微信一键登录</text>
       </button>
     </view>
 
     <text class="muted login-hint">注册新账号后即可提交线索和查看个人上报记录。</text>
 
-    <text class="muted" wx:if="{{error}}">{{error}}</text>
+    <text class="muted error-text" wx:if="{{error}}">{{error}}</text>
 
     <view class="demo-hint">
       <text class="muted demo-title">演示账号</text>

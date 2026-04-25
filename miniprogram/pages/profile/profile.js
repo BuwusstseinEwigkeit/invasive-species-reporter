@@ -1,4 +1,5 @@
 var api = require("../../utils/api");
+var app = getApp();
 
 Page({
   data: {
@@ -32,6 +33,10 @@ Page({
       var username = api.getMyUsername();
       var userId = api.getMyUserId();
       var role = api.getMyRole();
+      // Fallback: use globally cached role from login response
+      if (!role && app.globalData && app.globalData.role) {
+        role = app.globalData.role;
+      }
       this.setData({
         loggedIn: true,
         username: username,

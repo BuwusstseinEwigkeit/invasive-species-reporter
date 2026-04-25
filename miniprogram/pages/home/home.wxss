@@ -1,7 +1,23 @@
+/* Home page: page-shell provides padding, flex column fills screen */
+.home-page-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  /* NO overflow:hidden — lets scroll-view handle its own scroll */
+}
+
 .hero {
   background: linear-gradient(145deg, #284d34, #88a56d);
   color: #ffffff;
   margin-bottom: 24rpx;
+  /* Hero height is auto based on content */
+  flex-shrink: 0;
+}
+
+.hero-topline {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .hero-right {
@@ -68,6 +84,12 @@
   margin-top: 24rpx;
 }
 
+/* Stats card: auto height, flex-shrink prevents crushing */
+.stats-card {
+  flex-shrink: 0;
+  margin-bottom: 24rpx;
+}
+
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -85,6 +107,17 @@
   font-size: 40rpx;
   font-weight: 700;
   color: #305d3c;
+}
+
+/* Species scroll: JS-calculated height, flex-grow fills remaining */
+.species-scroll {
+  flex: 1;
+  /* height set via JS: style="height: {{scrollHeight}}px" */
+  min-height: 0; /* critical: allows flex child to shrink */
+}
+
+.species-card {
+  /* card provides padding and shadow */
 }
 
 .species-row {

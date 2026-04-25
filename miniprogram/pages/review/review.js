@@ -1,4 +1,5 @@
 var api = require("../../utils/api");
+var app = getApp();
 
 Page({
   data: {
@@ -43,10 +44,17 @@ Page({
       var speciesNames = (speciesRes.items || []).map(function (item) { return item.chineseName; });
 
       // Build report list with index mapping, keep original URLs for immediate rendering
+      var baseUrl = app.globalData.apiBaseUrl || "";
       var reports = (reportsRes.items || []).map(function (item) {
         var matchedIndex = speciesRes.items.findIndex(function (s) { return s.id === item.speciesId; });
+        // Pre-resolve imageUrl to absolute URL for immediate rendering
+        var imageUrl = item.imageUrl || "";
+        if (imageUrl && !imageUrl.startsWith("http")) {
+          imageUrl = imageUrl.startsWith("/") ? baseUrl + imageUrl : baseUrl + "/" + imageUrl;
+        }
         return Object.assign({}, item, {
-          reviewSpeciesIndex: matchedIndex >= 0 ? matchedIndex : 0
+          reviewSpeciesIndex: matchedIndex >= 0 ? matchedIndex : 0,
+          imageUrl: imageUrl
         });
       });
 
@@ -57,14 +65,16 @@ Page({
         loading: false
       });
 
-      // Download images in background for 真机调试 (non-blocking)
+      // Download images to local temp files for cached/offline display
       reports.forEach(function (r, i) {
-        api.downloadImage(r.imageUrl).then(function (localPath) {
-          if (localPath) {
-            var updated = "reports[" + i + "].imageUrl";
-            this.setData({ [updated]: localPath });
-          }
-        }.bind(this));
+        if (r.imageUrl && r.imageUrl.startsWith("http")) {
+          api.downloadImage(r.imageUrl).then(function (localPath) {
+            if (localPath) {
+              var updated = "reports[" + i + "].imageUrl";
+              this.setData({ [updated]: localPath });
+            }
+          }.bind(this));
+        }
       }.bind(this));
     } catch (error) {
       this.setData({ loading: false });

@@ -1,5 +1,5 @@
-<view class="page-shell">
-  <scroll-view scroll-y enable-back-to-top lower-threshold="100" bindscrolltolower="loadMoreSpecies">
+<view class="home-page-shell">
+  <!-- Hero: fixed at top, never scrolls -->
   <view class="hero card">
     <view class="hero-topline">
       <text class="hero-kicker">公众参与式监测</text>
@@ -22,7 +22,8 @@
     </view>
   </view>
 
-  <view class="card" wx:if="{{stats}}">
+  <!-- Stats: fixed, below hero -->
+  <view class="card stats-card" wx:if="{{stats}}">
     <view class="section-header" hover-class="hover-tap" bindtap="toggleStats">
       <text class="section-title">当前概况</text>
       <view class="arrow {{statsCollapsed ? '' : 'arrow-down'}}"></view>
@@ -49,36 +50,38 @@
     </view>
   </view>
 
-  <view class="card">
-    <view class="section-header" hover-class="hover-tap" bindtap="toggleSpecies">
-      <text class="section-title">重点物种（{{species.length}}）</text>
-      <view class="arrow {{speciesCollapsed ? '' : 'arrow-down'}}"></view>
-    </view>
-    <view class="collapse-body {{speciesCollapsed ? 'hidden' : ''}}">
-      <view
-        class="species-row"
-        hover-class="hover-bg"
-        wx:for="{{species}}"
-        wx:key="id"
-        data-id="{{item.id}}"
-        bindtap="openDetail"
-      >
-        <image
-          wx:if="{{item.avatar}}"
-          class="species-avatar"
-          src="{{item.avatar}}"
-          mode="aspectFill"
+  <!-- Species list: JS-calculated height, always scrolls -->
+  <scroll-view scroll-y enable-back-to-top lower-threshold="100" bindscrolltolower="loadMoreSpecies" class="species-scroll" style="height: {{scrollHeight}}px;">
+    <view class="card species-card">
+      <view class="section-header" hover-class="hover-tap" bindtap="toggleSpecies">
+        <text class="section-title">重点物种（{{species.length}}）</text>
+        <view class="arrow {{speciesCollapsed ? '' : 'arrow-down'}}"></view>
+      </view>
+      <view class="collapse-body {{speciesCollapsed ? 'hidden' : ''}}">
+        <view
+          class="species-row"
+          hover-class="hover-bg"
+          wx:for="{{species}}"
+          wx:key="id"
           data-id="{{item.id}}"
           bindtap="openDetail"
-        />
-        <view wx:else class="species-badge" data-id="{{item.id}}" bindtap="openDetail">{{item.category}}</view>
-        <view class="species-copy" data-id="{{item.id}}" bindtap="openDetail">
-          <text class="species-name">{{item.chineseName}}</text>
-          <text class="muted">{{item.latinName}}</text>
-          <text class="risk-line">风险等级：{{item.riskLevel}}</text>
+        >
+          <image
+            wx:if="{{item.avatar}}"
+            class="species-avatar"
+            src="{{item.avatar}}"
+            mode="aspectFill"
+            data-id="{{item.id}}"
+            bindtap="openDetail"
+          />
+          <view wx:else class="species-badge" data-id="{{item.id}}" bindtap="openDetail">{{item.category}}</view>
+          <view class="species-copy" data-id="{{item.id}}" bindtap="openDetail">
+            <text class="species-name">{{item.chineseName}}</text>
+            <text class="muted">{{item.latinName}}</text>
+            <text class="risk-line">风险等级：{{item.riskLevel}}</text>
+          </view>
         </view>
       </view>
     </view>
-  </view>
   </scroll-view>
 </view>

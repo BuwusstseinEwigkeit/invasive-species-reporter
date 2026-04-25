@@ -49,20 +49,41 @@
   padding-left: 8rpx;
 }
 
+.password-wrap {
+  position: relative;
+}
+
 .login-input {
   width: 100%;
   background: #f8f9f6;
   border: 2rpx solid #e4e8de;
   border-radius: 16rpx;
   padding: 28rpx 24rpx;
+  padding-right: 80rpx;
   box-sizing: border-box;
   font-size: 30rpx;
+  color: #1f2a1f;
   transition: border-color 0.2s;
+}
+
+.login-input::placeholder {
+  color: #b8c2b0;
 }
 
 .login-input:focus {
   border-color: #305d3c;
   background: #ffffff;
+}
+
+.pwd-toggle {
+  position: absolute;
+  right: 24rpx;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 36rpx;
+  line-height: 1;
+  padding: 8rpx;
+  z-index: 1;
 }
 
 .login-actions {

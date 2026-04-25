@@ -149,8 +149,9 @@ function initSchema() {
 
 function seedSpecies(speciesList) {
   const d = getDb();
+  // INSERT OR IGNORE: only add new species, never overwrite user-added ones
   const insert = d.prepare(`
-    INSERT OR REPLACE INTO species (id, chinese_name, latin_name, category, risk_level, avatar, summary, harm, suggestion, origin, control_methods, relations)
+    INSERT OR IGNORE INTO species (id, chinese_name, latin_name, category, risk_level, avatar, summary, harm, suggestion, origin, control_methods, relations)
     VALUES (@id, @chineseName, @latinName, @category, @riskLevel, @avatar, @summary, @harm, @suggestion, @origin, @controlMethods, @relations)
   `);
 
@@ -178,8 +179,9 @@ function seedSpecies(speciesList) {
 
 function seedReports(reports) {
   const d = getDb();
+  // INSERT OR IGNORE: only add new mock reports, preserve user-created ones
   const insert = d.prepare(`
-    INSERT OR REPLACE INTO reports (id, user_id, species_id, ai_top1, ai_score, ai_candidates, image_url, latitude, longitude, address, remark, status, created_at)
+    INSERT OR IGNORE INTO reports (id, user_id, species_id, ai_top1, ai_score, ai_candidates, image_url, latitude, longitude, address, remark, status, created_at)
     VALUES (@id, @userId, @speciesId, @aiTop1, @aiScore, @aiCandidates, @imageUrl, @latitude, @longitude, @address, @remark, @status, @createdAt)
   `);
 

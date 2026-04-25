@@ -22,6 +22,13 @@ Page({
     this.loadMapData();
   },
 
+  onMapLoaded() {
+    // Map is ready — now apply heatmap if there are cached reports
+    if (this.data.reports && this.data.reports.length > 0) {
+      this.updateHeatmap(this.data.reports);
+    }
+  },
+
   async loadMapData() {
     try {
       const [reportsRes, speciesRes] = await Promise.all([
@@ -64,18 +71,19 @@ Page({
       id: index,
       latitude: item.latitude,
       longitude: item.longitude,
-      width: 32,
-      height: 32,
-      title: item.speciesId,
-      label: {
-        content: item.aiTop1,
+      width: 36,
+      height: 36,
+      title: item.aiTop1,
+      callout: {
+        content: item.aiTop1 + "\n" + (item.address || ""),
         fontSize: 12,
         borderWidth: 1,
         borderColor: "#305d3c",
         borderRadius: 8,
-        padding: 4,
+        padding: 8,
         bgColor: "#ffffff",
-        textAlign: "center"
+        textAlign: "left",
+        display: "ALWAYS"
       }
     }));
 
@@ -88,38 +96,35 @@ Page({
   },
 
   buildHeatmapPoints(reports) {
-    // Count reports per coordinate cluster (within ~0.001 deg ~= 100m)
     var coordMap = {};
     reports.forEach(function (item) {
       var lat = Number(item.latitude);
       var lng = Number(item.longitude);
-      if (!lat || !lng) return;
-      // Round to ~0.01 deg (~1km grid) for heatmap aggregation
+      // Skip invalid coords (0,0 is ocean — outside valid China range)
+      if (!lat || lat < 20 || lat > 60 || !lng || lng < 70 || lng > 140) return;
       var key = lat.toFixed(2) + "," + lng.toFixed(2);
       if (coordMap[key]) {
         coordMap[key].weight += 1;
       } else {
-        coordMap[key] = {
-          latitude: lat,
-          longitude: lng,
-          weight: 1
-        };
+        coordMap[key] = { latitude: lat, longitude: lng, weight: 1 };
       }
     });
-
     return Object.keys(coordMap).map(function (key) { return coordMap[key]; });
   },
 
   updateHeatmap(reports) {
     var points = this.buildHeatmapPoints(reports);
-    if (points.length === 0) return;
+    if (points.length === 0) {
+      wx.showToast({ title: "暂无有效坐标用于热力图", icon: "none", duration: 1500 });
+      return;
+    }
 
     try {
       var mapCtx = wx.createMapContext("risk-map");
       mapCtx.addHeatMap({
         points: points,
-        radius: 40,
-        opacity: 0.5,
+        radius: 30,
+        opacity: 0.7,
         colorGradient: {
           "0.0": "#7fc8a9",
           "0.3": "#6abf8b",
@@ -131,11 +136,11 @@ Page({
           console.log("[heatmap] addHeatMap success, points=" + points.length);
         },
         fail: function (err) {
-          console.log("[heatmap] addHeatMap not supported, err=" + JSON.stringify(err));
+          console.log("[heatmap] addHeatMap fail:", JSON.stringify(err));
         }
       });
     } catch (_e) {
-      console.log("[heatmap] addHeatMap unavailable in this environment");
+      console.log("[heatmap] addHeatMap unavailable");
     }
   },
 

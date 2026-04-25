@@ -5,7 +5,8 @@ Page({
     username: "",
     password: "",
     error: "",
-    submitting: false
+    submitting: false,
+    showPassword: false
   },
 
   onUsernameInput(e) {
@@ -14,6 +15,10 @@ Page({
 
   onPasswordInput(e) {
     this.setData({ password: e.detail.value });
+  },
+
+  togglePassword() {
+    this.setData({ showPassword: !this.data.showPassword });
   },
 
   async onLogin() {
