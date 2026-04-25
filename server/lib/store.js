@@ -30,6 +30,11 @@ function getReports(status, page, limit) {
   return db.getReports(status, page, limit);
 }
 
+function getReportsByUser(userId, status, page, limit) {
+  ensureInitialized();
+  return db.getReportsByUser(userId, status, page, limit);
+}
+
 function getSpeciesReports(speciesId) {
   ensureInitialized();
   return db.getSpeciesReports(speciesId);
@@ -43,6 +48,36 @@ function createReport(payload) {
 function reviewReport(reportId, payload) {
   ensureInitialized();
   return db.reviewReport(reportId, payload);
+}
+
+function getApprovedReportsForExport() {
+  ensureInitialized();
+  return db.getApprovedReportsForExport();
+}
+
+function createNotification(userId, title, body, type, referenceId) {
+  ensureInitialized();
+  return db.createNotification(userId, title, body, type, referenceId);
+}
+
+function getNotifications(userId, limit) {
+  ensureInitialized();
+  return db.getNotifications(userId, limit);
+}
+
+function getUnreadNotificationCount(userId) {
+  ensureInitialized();
+  return db.getUnreadNotificationCount(userId);
+}
+
+function markNotificationRead(id) {
+  ensureInitialized();
+  return db.markNotificationRead(id);
+}
+
+function markAllNotificationsRead(userId) {
+  ensureInitialized();
+  db.markAllNotificationsRead(userId);
 }
 
 function getStats() {
@@ -79,9 +114,16 @@ module.exports = {
   getSpeciesList,
   getSpeciesById,
   getReports,
+  getReportsByUser,
   getSpeciesReports,
   createReport,
   reviewReport,
+  getApprovedReportsForExport,
+  createNotification,
+  getNotifications,
+  getUnreadNotificationCount,
+  markNotificationRead,
+  markAllNotificationsRead,
   getStats,
   getPoints,
   addPoints,

@@ -45,6 +45,16 @@
 - Do not remove async job flow; front-end already depends on it.
 - Database schema is in `server/lib/database.js` → `initSchema()`
 
+## Completed (v0.6.0)
+
+1. ✅ **API 错误格式统一化** — 所有端点使用 `sendError(res, error, code)` / `sendSuccess(res, data, statusCode)` 统一格式，前端兼容新旧格式
+2. ✅ **前端全局错误提示** — request()/uploadImage() 失败时自动弹出 Toast，app.js 增加 `wx.onError` 全局异常捕获
+3. ✅ **HTTPS 与生产配置** — 新建 `deploy/` 目录（nginx.conf, https-server.js, deploy.sh）
+4. ✅ **物种知识图谱** — species 表增加 `relations` 字段，详情页新增生态关系图谱卡片（天敌/共生/类似），节点可点击跳转
+5. ✅ **上报数据导出 CSV** — 新增 `GET /api/reports/export/csv` 端点，返回含 BOM 的 UTF-8 CSV（Excel 兼容），前端"数据导出"菜单项调用下载
+6. ✅ **消息通知系统** — 新增 `notifications` 表，审核通过/驳回时自动创建通知，`GET /api/notifications/:userId` 列表端点（含 `unread` 计数），`POST /api/notifications/:id/read` 和 `POST /api/notifications/:userId/read-all` 标记已读，前端通知页面及未读标记徽章
+7. ✅ **Python 识别微服务 (Phase 5)** — 新建 `python-service/` 目录（Flask 应用 + Dockerfile + requirements.txt），支持 JSON/base64 和 multipart 两种输入格式，mock 识别器始终可用，可选 PyTorch ResNet 模型；`docker-compose.yml` 编排 Python 服务；Node.js 新增 `recognizeWithPython` 提供商，配置 `PYTHON_RECOGNITION_URL` 即可加入识别链（Zhipu → Moonshot → Python → Ollama → Mock）
+
 ## Completed This Session (v0.5.0)
 
 1. ✅ **登录页** — 新增登录/注册页面，支持账号密码登录注册，首页顶部显示登录状态
@@ -53,14 +63,20 @@
 4. ✅ **物种图片升级** — 12 种物种全部替换为从百度百科/Wikimedia Commons 下载的真实照片（非生成图）
    - 来源：百度百科概述图或图册（10种）+ Wikimedia Commons（2种）
 5. ✅ **列表分页** — `/api/reports` 支持 `page`/`limit` 参数，返回 `total`/`totalPages` 分页信息
+6. ✅ **我的上报用户过滤** — 新增 `GET /api/reports/my` 端点，JWT 鉴权后只返回当前用户的上报记录
+7. ✅ **微信登录集成** — 新增 `POST /api/auth/wx-login` 端点，用户表增加 `openid` 字段，前端登录页增加微信一键登录按钮（配置 `WECHAT_APPID`+`WECHAT_SECRET` 后可调用真实微信 API，否则使用 dev 模式，以 code 为 openid）
+8. ✅ **Kimi/Moonshot 识别后备** — 新增 Moonshot API 提供商，配置链：智谱 → Moonshot → Ollama(可选) → Mock
+9. ✅ **图片压缩选项** — 上报页面增加压缩质量选择器（高清90%/标准60%/极限30%），替代原来固定的 quality=60
+10. ✅ **地图热力图** — 地图页增加热力图层，点击热力按钮切换，基于 MapContext.addHeatMap 实现
+11. ✅ **详情页信息增强** — 物种表增加 origin（原产地）和 control_methods（防治方法）字段，种子数据全部更新，详情页新增四格信息卡片和防治方法面板 — 地图页增加热力图层，点击热力按钮切换，基于 MapContext.addHeatMap 实现
 
 ## Recommended Next Steps
 
-1. Add a second cloud API provider for fallback (e.g., Kimi/Moonshot vision API) instead of local Ollama
+1. ~~Add a second cloud API provider for fallback (e.g., Kimi/Moonshot vision API)~~ → Done
 2. ~~Add auth and reviewer roles~~ → Done (JWT + role middleware)
-3. Add WeChat login (wx.login) integration for real user auth
+3. ~~Add WeChat login (wx.login) integration for real user auth~~ → Done
 4. ~~Add pagination to `/api/reports`~~ → Done
-5. Set up proper HTTPS for production
-6. Add My Reports page user-scoped filtering (currently shows all, not user-specific)
-7. Add image compression toggle or quality setting in report page
+5. ~~Add My Reports page user-scoped filtering~~ → Done
+6. Set up proper HTTPS for production
+7. ~~Add image compression toggle or quality setting in report page~~ → Done
 8. Add species distribution heatmap layer on map page

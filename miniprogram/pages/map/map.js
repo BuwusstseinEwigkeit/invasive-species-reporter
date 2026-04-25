@@ -10,7 +10,8 @@ Page({
     speciesOptions: [],
     speciesNames: ["全部物种"],
     selectedSpeciesIndex: 0,
-    panelCollapsed: false
+    panelCollapsed: false,
+    heatmapEnabled: true
   },
 
   togglePanel() {
@@ -82,6 +83,77 @@ Page({
       reports,
       markers
     });
+
+    this.updateHeatmap(reports);
+  },
+
+  buildHeatmapPoints(reports) {
+    // Count reports per coordinate cluster (within ~0.001 deg ~= 100m)
+    var coordMap = {};
+    reports.forEach(function (item) {
+      var lat = Number(item.latitude);
+      var lng = Number(item.longitude);
+      if (!lat || !lng) return;
+      // Round to ~0.01 deg (~1km grid) for heatmap aggregation
+      var key = lat.toFixed(2) + "," + lng.toFixed(2);
+      if (coordMap[key]) {
+        coordMap[key].weight += 1;
+      } else {
+        coordMap[key] = {
+          latitude: lat,
+          longitude: lng,
+          weight: 1
+        };
+      }
+    });
+
+    return Object.keys(coordMap).map(function (key) { return coordMap[key]; });
+  },
+
+  updateHeatmap(reports) {
+    var points = this.buildHeatmapPoints(reports);
+    if (points.length === 0) return;
+
+    try {
+      var mapCtx = wx.createMapContext("risk-map");
+      mapCtx.addHeatMap({
+        points: points,
+        radius: 40,
+        opacity: 0.5,
+        colorGradient: {
+          "0.0": "#7fc8a9",
+          "0.3": "#6abf8b",
+          "0.5": "#e8b435",
+          "0.7": "#e06c3a",
+          "1.0": "#c0392b"
+        },
+        success: function () {
+          console.log("[heatmap] addHeatMap success, points=" + points.length);
+        },
+        fail: function (err) {
+          console.log("[heatmap] addHeatMap not supported, err=" + JSON.stringify(err));
+        }
+      });
+    } catch (_e) {
+      console.log("[heatmap] addHeatMap unavailable in this environment");
+    }
+  },
+
+  toggleHeatmap() {
+    var enabled = !this.data.heatmapEnabled;
+    this.setData({ heatmapEnabled: enabled });
+
+    if (enabled) {
+      this.updateHeatmap(this.data.reports);
+    } else {
+      try {
+        var mapCtx = wx.createMapContext("risk-map");
+        mapCtx.removeHeatMap({
+          success: function () { console.log("[heatmap] removed"); },
+          fail: function () { console.log("[heatmap] remove failed"); }
+        });
+      } catch (_e) { /* ignore */ }
+    }
   },
 
   onMarkerTap(event) {

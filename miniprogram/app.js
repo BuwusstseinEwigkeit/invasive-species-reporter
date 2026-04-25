@@ -40,5 +40,15 @@ App({
   },
   onLaunch: function () {
     console.log("[app] launch, version=v0.6.0, base=" + this.globalData.apiBaseUrl);
+
+    // Global unhandled error handler
+    wx.onError(function (error) {
+      console.error("[app] unhandled error:", error);
+      wx.showToast({
+        title: "出现异常，请稍后重试",
+        icon: "none",
+        duration: 3000
+      });
+    });
   }
 });

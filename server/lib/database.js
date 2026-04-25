@@ -30,6 +30,8 @@ function initSchema() {
       summary TEXT,
       harm TEXT,
       suggestion TEXT,
+      origin TEXT,
+      control_methods TEXT,
       created_at TEXT DEFAULT (datetime('now'))
     );
 
@@ -66,6 +68,7 @@ function initSchema() {
       username TEXT UNIQUE NOT NULL,
       password_hash TEXT NOT NULL,
       role TEXT DEFAULT 'user' CHECK(role IN ('user','reviewer','admin')),
+      openid TEXT UNIQUE,
       created_at TEXT DEFAULT (datetime('now'))
     );
 
@@ -107,14 +110,48 @@ function initSchema() {
 
     CREATE INDEX IF NOT EXISTS idx_points_log_user ON points_log(user_id);
     CREATE INDEX IF NOT EXISTS idx_purchases_user ON purchases(user_id);
+
+    CREATE TABLE IF NOT EXISTS notifications (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      title TEXT NOT NULL,
+      body TEXT DEFAULT '',
+      type TEXT NOT NULL DEFAULT 'info',
+      reference_id TEXT,
+      is_read INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);
   `);
+
+  // Schema upgrades for existing databases
+  try {
+    d.exec("ALTER TABLE users ADD COLUMN openid TEXT");
+  } catch (_e) { /* column already exists */ }
+
+  try {
+    d.exec("ALTER TABLE species ADD COLUMN origin TEXT");
+  } catch (_e) { /* column already exists */ }
+
+  try {
+    d.exec("ALTER TABLE species ADD COLUMN control_methods TEXT");
+  } catch (_e) { /* column already exists */ }
+
+  try {
+    d.exec("ALTER TABLE species ADD COLUMN relations TEXT");
+  } catch (_e) { /* column already exists */ }
+
+  try {
+    d.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_openid ON users(openid)");
+  } catch (_e) { /* ignore */ }
 }
 
 function seedSpecies(speciesList) {
   const d = getDb();
   const insert = d.prepare(`
-    INSERT OR REPLACE INTO species (id, chinese_name, latin_name, category, risk_level, avatar, summary, harm, suggestion)
-    VALUES (@id, @chineseName, @latinName, @category, @riskLevel, @avatar, @summary, @harm, @suggestion)
+    INSERT OR REPLACE INTO species (id, chinese_name, latin_name, category, risk_level, avatar, summary, harm, suggestion, origin, control_methods, relations)
+    VALUES (@id, @chineseName, @latinName, @category, @riskLevel, @avatar, @summary, @harm, @suggestion, @origin, @controlMethods, @relations)
   `);
 
   const seedMany = d.transaction((items) => {
@@ -128,7 +165,10 @@ function seedSpecies(speciesList) {
         avatar: item.avatar,
         summary: item.summary,
         harm: item.harm,
-        suggestion: item.suggestion
+        suggestion: item.suggestion,
+        origin: item.origin || '',
+        controlMethods: item.controlMethods || '',
+        relations: JSON.stringify(item.relations || [])
       });
     }
   });
@@ -200,7 +240,10 @@ function rowToSpecies(row) {
     avatar: row.avatar,
     summary: row.summary,
     harm: row.harm,
-    suggestion: row.suggestion
+    suggestion: row.suggestion,
+    origin: row.origin || '',
+    controlMethods: row.control_methods || '',
+    relations: JSON.parse(row.relations || '[]')
   };
 }
 
@@ -240,6 +283,7 @@ function rowToUser(row) {
     username: row.username,
     passwordHash: row.password_hash,
     role: row.role,
+    openid: row.openid,
     createdAt: row.created_at
   };
 }
@@ -270,6 +314,27 @@ function getReports(status, page, limit) {
   } else {
     rows = d.prepare("SELECT * FROM reports ORDER BY created_at DESC LIMIT ? OFFSET ?").all(l, offset);
     total = d.prepare("SELECT COUNT(*) as c FROM reports").get().c;
+  }
+
+  return {
+    items: rows.map(rowToReport),
+    pagination: { page: p, limit: l, total, totalPages: Math.ceil(total / l) }
+  };
+}
+
+function getReportsByUser(userId, status, page, limit) {
+  const d = getDb();
+  const p = Math.max(1, Number(page) || 1);
+  const l = Math.min(100, Math.max(1, Number(limit) || 20));
+  const offset = (p - 1) * l;
+
+  let rows, total;
+  if (status) {
+    rows = d.prepare("SELECT * FROM reports WHERE user_id = ? AND status = ? ORDER BY created_at DESC LIMIT ? OFFSET ?").all(userId, status, l, offset);
+    total = d.prepare("SELECT COUNT(*) as c FROM reports WHERE user_id = ? AND status = ?").get(userId, status).c;
+  } else {
+    rows = d.prepare("SELECT * FROM reports WHERE user_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?").all(userId, l, offset);
+    total = d.prepare("SELECT COUNT(*) as c FROM reports WHERE user_id = ?").get(userId).c;
   }
 
   return {
@@ -348,6 +413,23 @@ function getReviewLogs(reportId) {
   return getDb().prepare("SELECT * FROM review_logs WHERE report_id = ? ORDER BY created_at DESC").all(reportId).map(rowToReviewLog);
 }
 
+// --- Export ---
+
+function getApprovedReportsForExport() {
+  const rows = getDb().prepare(`
+    SELECT r.id, r.user_id, r.ai_top1, r.ai_score, r.image_url,
+           r.latitude, r.longitude, r.address, r.remark, r.created_at,
+           s.chinese_name AS species_name, s.latin_name AS species_latin,
+           s.risk_level AS species_risk, s.category AS species_category,
+           s.origin AS species_origin
+    FROM reports r
+    LEFT JOIN species s ON r.species_id = s.id
+    WHERE r.status = 'approved'
+    ORDER BY r.created_at DESC
+  `).all();
+  return rows;
+}
+
 // --- Stats ---
 
 function getStats() {
@@ -401,6 +483,23 @@ function getUserByUsername(username) {
 function getUserById(id) {
   const row = getDb().prepare("SELECT * FROM users WHERE id = ?").get(id);
   return row ? rowToUser(row) : null;
+}
+
+function getUserByOpenId(openid) {
+  const row = getDb().prepare("SELECT * FROM users WHERE openid = ?").get(openid);
+  return row ? rowToUser(row) : null;
+}
+
+function createUserFromOpenId(openid, username) {
+  const d = getDb();
+  const id = `user-${Date.now()}`;
+  // Generate a random password hash (not used for WeChat login)
+  const randomHash = hashPassword(Math.random().toString(36));
+  const displayName = username || `wx_${openid.slice(-8)}`;
+  d.prepare("INSERT INTO users (id, username, password_hash, role, openid) VALUES (?, ?, ?, 'user', ?)").run(
+    id, displayName, randomHash, openid
+  );
+  return rowToUser(d.prepare("SELECT * FROM users WHERE id = ?").get(id));
 }
 
 function authenticateUser(username, password) {
@@ -530,6 +629,54 @@ function rowToPurchase(row) {
   };
 }
 
+// --- Notification queries ---
+
+function createNotification(userId, title, body, type, referenceId) {
+  const d = getDb();
+  const id = `notif-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+  d.prepare(`
+    INSERT INTO notifications (id, user_id, title, body, type, reference_id)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(id, userId, title, body || "", type || "info", referenceId || null);
+  return rowToNotification(d.prepare("SELECT * FROM notifications WHERE id = ?").get(id));
+}
+
+function getNotifications(userId, limit = 50) {
+  return getDb().prepare(
+    "SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT ?"
+  ).all(userId, limit).map(rowToNotification);
+}
+
+function getUnreadNotificationCount(userId) {
+  const row = getDb().prepare(
+    "SELECT COUNT(*) as c FROM notifications WHERE user_id = ? AND is_read = 0"
+  ).get(userId);
+  return row ? row.c : 0;
+}
+
+function markNotificationRead(id) {
+  getDb().prepare("UPDATE notifications SET is_read = 1 WHERE id = ?").run(id);
+  const row = getDb().prepare("SELECT * FROM notifications WHERE id = ?").get(id);
+  return row ? rowToNotification(row) : null;
+}
+
+function markAllNotificationsRead(userId) {
+  getDb().prepare("UPDATE notifications SET is_read = 1 WHERE user_id = ? AND is_read = 0").run(userId);
+}
+
+function rowToNotification(row) {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    title: row.title,
+    body: row.body,
+    type: row.type,
+    referenceId: row.reference_id,
+    isRead: !!row.is_read,
+    createdAt: row.created_at
+  };
+}
+
 module.exports = {
   getDb,
   initSchema,
@@ -539,15 +686,24 @@ module.exports = {
   getSpeciesList,
   getSpeciesById,
   getReports,
+  getReportsByUser,
   getSpeciesReports,
   getReportById,
   createReport,
   reviewReport,
   getReviewLogs,
   getStats,
+  getApprovedReportsForExport,
+  createNotification,
+  getNotifications,
+  getUnreadNotificationCount,
+  markNotificationRead,
+  markAllNotificationsRead,
   createUser,
   getUserByUsername,
   getUserById,
+  getUserByOpenId,
+  createUserFromOpenId,
   authenticateUser,
   hashPassword,
   verifyPassword,

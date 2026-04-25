@@ -22,7 +22,14 @@ Page({
     searchKeyword: "",
     filteredSpeciesNames: ["暂不选择"],
     filteredSpeciesIndexes: [0],
-    candidatesCollapsed: false
+    candidatesCollapsed: false,
+    compressQuality: 60,
+    compressLevels: [
+      { value: 90, label: "高清 (体积较大)" },
+      { value: 60, label: "标准 (推荐)" },
+      { value: 30, label: "极限 (最小体积)" }
+    ],
+    compressLevelIndex: 1
   },
 
   toggleCandidates() {
@@ -82,11 +89,20 @@ Page({
     });
   },
 
+  onCompressChange(event) {
+    var index = Number(event.detail.value);
+    this.setData({
+      compressLevelIndex: index,
+      compressQuality: this.data.compressLevels[index].value
+    });
+  },
+
   compressSelectedImage(filePath) {
+    var quality = this.data.compressQuality;
     return new Promise((resolve) => {
       wx.compressImage({
         src: filePath,
-        quality: 60,
+        quality: quality,
         success: (res) => resolve(res.tempFilePath),
         fail: () => resolve(filePath)
       });

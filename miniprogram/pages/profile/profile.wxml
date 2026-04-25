@@ -60,6 +60,12 @@
 
     <!-- Menu -->
     <view class="card menu-card">
+      <view class="menu-item" hover-class="hover-bg" bindtap="goNotifications">
+        <text class="menu-icon">🔔</text>
+        <text class="menu-label">消息通知</text>
+        <text class="badge" wx:if="{{unread > 0}}">{{unread > 99 ? '99+' : unread}}</text>
+        <text class="menu-arrow">›</text>
+      </view>
       <view class="menu-item" hover-class="hover-bg" bindtap="goMyReports">
         <text class="menu-icon">📋</text>
         <text class="menu-label">我的上报</text>
@@ -68,6 +74,11 @@
       <view class="menu-item" hover-class="hover-bg" bindtap="goApprovedReports">
         <text class="menu-icon">✅</text>
         <text class="menu-label">已核实记录</text>
+        <text class="menu-arrow">›</text>
+      </view>
+      <view class="menu-item" hover-class="hover-bg" bindtap="onExportData">
+        <text class="menu-icon">📊</text>
+        <text class="menu-label">数据导出</text>
         <text class="menu-arrow">›</text>
       </view>
       <view class="menu-item" hover-class="hover-bg" bindtap="goShop">

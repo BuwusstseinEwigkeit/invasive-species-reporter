@@ -80,6 +80,26 @@
   box-sizing: border-box;
 }
 
+.compress-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #f7f7f1;
+  border-radius: 18rpx;
+  padding: 16rpx 20rpx;
+}
+
+.compress-label {
+  font-size: 26rpx;
+}
+
+.compress-picker {
+  font-size: 26rpx;
+  color: #305d3c;
+  font-weight: 500;
+  padding: 4rpx 12rpx;
+}
+
 .submit-button {
   margin-top: 12rpx;
 }

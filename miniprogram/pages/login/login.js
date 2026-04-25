@@ -71,5 +71,35 @@ Page({
         submitting: false
       });
     }
+  },
+
+  async onWxLogin() {
+    this.setData({ submitting: true, error: "" });
+
+    try {
+      const result = await new Promise(function (resolve, reject) {
+        wx.login({
+          success: function (res) {
+            if (res.code) {
+              resolve(res.code);
+            } else {
+              reject(new Error("获取微信登录码失败"));
+            }
+          },
+          fail: function () {
+            reject(new Error("调用 wx.login 失败"));
+          }
+        });
+      });
+
+      await api.wxLogin(result);
+      wx.showToast({ title: "微信登录成功", icon: "success" });
+      wx.navigateBack();
+    } catch (err) {
+      this.setData({
+        error: "微信登录失败：" + (err.message || "请稍后重试"),
+        submitting: false
+      });
+    }
   }
 });

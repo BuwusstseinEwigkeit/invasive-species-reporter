@@ -9,7 +9,8 @@ Page({
     points: 0,
     pointsLogs: [],
     loading: true,
-    logsCollapsed: false
+    logsCollapsed: false,
+    unread: 0
   },
 
   toggleLogs() {
@@ -39,6 +40,7 @@ Page({
         loading: true
       });
       this.loadPoints();
+      this.loadUnreadCount();
     } else {
       this.setData({
         loggedIn: false,
@@ -92,6 +94,19 @@ Page({
     });
   },
 
+  async loadUnreadCount() {
+    try {
+      var userId = this.data.userId;
+      if (!userId) return;
+      var res = await api.getNotifications(userId);
+      this.setData({ unread: res.unread || 0 });
+    } catch (_e) { /* ignore */ }
+  },
+
+  goNotifications() {
+    wx.navigateTo({ url: "/pages/notifications/notifications" });
+  },
+
   goMyReports() {
     wx.navigateTo({ url: "/pages/my-reports/my-reports" });
   },
@@ -110,5 +125,25 @@ Page({
 
   goMyDetail() {
     wx.showToast({ title: "功能开发中", icon: "none" });
+  },
+
+  onExportData() {
+    var self = this;
+    wx.showModal({
+      title: "数据导出",
+      content: "将导出所有审核通过的上报记录为 CSV 文件，是否继续？",
+      success(res) {
+        if (res.confirm) {
+          wx.showLoading({ title: "导出中..." });
+          api.exportCsv().then(function (path) {
+            wx.hideLoading();
+            wx.showToast({ title: "导出成功", icon: "success" });
+          }).catch(function () {
+            wx.hideLoading();
+            wx.showToast({ title: "导出失败，请重试", icon: "none" });
+          });
+        }
+      }
+    });
   }
 });

@@ -23,7 +23,7 @@ Page({
   async loadReports() {
     this.setData({ loading: true });
     try {
-      var res = await api.getReports();
+      var res = await api.getMyReports();
       this.setData({ reports: res.items || [], loading: false });
       this.applyFilters();
     } catch (error) {

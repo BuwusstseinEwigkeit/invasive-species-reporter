@@ -255,6 +255,170 @@ async function recognizeWithOllama({ imageBuffer, mimeType, speciesList }) {
   };
 }
 
+// --- Python microservice provider ---
+
+const PYTHON_RECOGNITION_URL = process.env.PYTHON_RECOGNITION_URL || "";
+
+async function recognizeWithPython({ filePath, mimeType, speciesList }) {
+  if (!PYTHON_RECOGNITION_URL) {
+    throw new Error("PYTHON_RECOGNITION_URL is not configured.");
+  }
+
+  const fs = require("fs");
+  const imageBuffer = fs.readFileSync(filePath);
+  const base64Image = imageBuffer.toString("base64");
+
+  const response = await fetch(`${PYTHON_RECOGNITION_URL}/recognize`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      image_base64: base64Image,
+      mime_type: mimeType || "image/jpeg",
+      species_list: speciesList
+    })
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Python service failed: ${response.status} ${errorText}`);
+  }
+
+  const result = await response.json();
+
+  if (result.error) {
+    throw new Error(`Python service error: ${result.error}`);
+  }
+
+  return {
+    matchedSpeciesId: result.matchedSpeciesId || "",
+    matchedSpeciesName: result.matchedSpeciesName || "",
+    confidence: Number(result.confidence || 0),
+    summary: result.summary || "",
+    topCandidates: Array.isArray(result.topCandidates) ? result.topCandidates.slice(0, 3) : []
+  };
+}
+
+// --- MiniMax (cloud vision) provider ---
+//
+// MiniMax-VL-3: latest vision-language model, OpenAI-compatible format
+// Docs: https://platform.minimaxi.com/docs/api-reference/text-openai-api
+
+const MINIMAX_API_KEY = process.env.MINIMAX_API_KEY || "";
+const MINIMAX_BASE_URL = process.env.MINIMAX_BASE_URL || "https://api.minimaxi.com/v1/chat/completions";
+const MINIMAX_MODEL = process.env.MINIMAX_MODEL || "MiniMax-VL-3";
+
+async function recognizeWithMiniMax({ imageBuffer, mimeType, speciesList }) {
+  if (!MINIMAX_API_KEY) {
+    throw new Error("MINIMAX_API_KEY is not configured.");
+  }
+
+  const base64Image = `data:${mimeType};base64,${imageBuffer.toString("base64")}`;
+
+  const response = await fetch(MINIMAX_BASE_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${MINIMAX_API_KEY}`
+    },
+    body: JSON.stringify({
+      model: MINIMAX_MODEL,
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: `${buildPrompt(speciesList)}\n\n请识别这张图中的疑似外来物种，并按要求返回 JSON。`
+            },
+            {
+              type: "image_url",
+              image_url: {
+                url: base64Image
+              }
+            }
+          ]
+        }
+      ],
+      temperature: 0.1
+    })
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`MiniMax request failed: ${response.status} ${errorText}`);
+  }
+
+  const payload = await response.json();
+  const parsed = extractJson(extractTextFromResponse(payload));
+
+  return {
+    matchedSpeciesId: parsed.matchedSpeciesId || "",
+    matchedSpeciesName: parsed.matchedSpeciesName || "",
+    confidence: Number(parsed.confidence || 0),
+    summary: parsed.summary || "",
+    topCandidates: Array.isArray(parsed.topCandidates) ? parsed.topCandidates.slice(0, 3) : []
+  };
+}
+
+// --- Moonshot/Kimi (cloud vision) provider ---
+
+const MOONSHOT_API_KEY = process.env.MOONSHOT_API_KEY || "";
+const MOONSHOT_BASE_URL = process.env.MOONSHOT_BASE_URL || "https://api.moonshot.cn/v1/chat/completions";
+const MOONSHOT_MODEL = process.env.MOONSHOT_MODEL || "moonshot-v1-8k-vision-preview";
+
+async function recognizeWithMoonshot({ imageBuffer, mimeType, speciesList }) {
+  if (!MOONSHOT_API_KEY) {
+    throw new Error("MOONSHOT_API_KEY is not configured.");
+  }
+
+  const base64Image = `data:${mimeType};base64,${imageBuffer.toString("base64")}`;
+
+  const response = await fetch(MOONSHOT_BASE_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${MOONSHOT_API_KEY}`
+    },
+    body: JSON.stringify({
+      model: MOONSHOT_MODEL,
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: `${buildPrompt(speciesList)}\n\n请识别这张图中的疑似外来物种，并按要求返回 JSON。`
+            },
+            {
+              type: "image_url",
+              image_url: {
+                url: base64Image
+              }
+            }
+          ]
+        }
+      ],
+      temperature: 0.1
+    })
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Moonshot request failed: ${response.status} ${errorText}`);
+  }
+
+  const payload = await response.json();
+  const parsed = extractJson(extractTextFromResponse(payload));
+
+  return {
+    matchedSpeciesId: parsed.matchedSpeciesId || "",
+    matchedSpeciesName: parsed.matchedSpeciesName || "",
+    confidence: Number(parsed.confidence || 0),
+    summary: parsed.summary || "",
+    topCandidates: Array.isArray(parsed.topCandidates) ? parsed.topCandidates.slice(0, 3) : []
+  };
+}
+
 // --- Mock provider ---
 
 async function recognizeWithMock({ speciesList }) {
@@ -297,10 +461,21 @@ async function recognizeSpeciesFromImage({ filePath, mimeType, speciesList }) {
   const preparedImage = await prepareImageForRecognition(filePath, mimeType);
   const imageBuffer = Buffer.from(preparedImage.base64Data, "base64");
 
-  // Primary chain: Zhipu (cloud) -> mock (degraded fallback)
+  // Provider chain: MiniMax (primary, most cost-effective) -> Zhipu (cloud) -> Moonshot (cloud fallback) -> Python (Docker microservice) -> Mock
   const providers = [
+    { name: "minimax", fn: recognizeWithMiniMax },
     { name: "zhipu", fn: recognizeWithZhipu }
   ];
+
+  // Moonshot/Kimi as first cloud fallback (set MOONSHOT_API_KEY to enable)
+  if (MOONSHOT_API_KEY) {
+    providers.push({ name: "moonshot", fn: recognizeWithMoonshot });
+  }
+
+  // Python Docker microservice (set PYTHON_RECOGNITION_URL to enable, e.g. http://localhost:5100)
+  if (PYTHON_RECOGNITION_URL) {
+    providers.push({ name: "python", fn: recognizeWithPython });
+  }
 
   // Optional: Ollama local model for dev/testing only (set OLLAMA_VISION_MODEL to enable)
   if (OLLAMA_VISION_MODEL) {
@@ -329,9 +504,9 @@ async function recognizeSpeciesFromImage({ filePath, mimeType, speciesList }) {
       console.error(`[recognition] provider ${provider.name} failed:`, error.message);
       lastError = error;
 
-      // If Zhipu fails due to missing API key, skip to next provider
-      if (provider.name === "zhipu" && error.message.includes("ZHIPU_API_KEY is not configured")) {
-        console.log(`[recognition] ZHIPU_API_KEY not configured, falling back to next provider`);
+      // If a provider fails due to missing API key, skip to next provider
+      if (error.message.includes("API_KEY is not configured")) {
+        console.log(`[recognition] ${provider.name} API key not configured, falling back`);
         continue;
       }
 

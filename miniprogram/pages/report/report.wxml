@@ -8,7 +8,13 @@
       <image wx:if="{{localImageUrl}}" class="preview-image" src="{{localImageUrl}}" mode="aspectFill" lazy-load />
       <text class="muted" wx:if="{{isUploading}}">图片上传中...</text>
       <text class="muted" wx:if="{{uploadedImageUrl && !isUploading}}">图片已上传到服务端</text>
-      <text class="muted">上传前会自动压缩图片，降低识别超时概率。</text>
+      <view class="compress-row">
+        <text class="muted compress-label">图片压缩</text>
+        <picker range="{{compressLevels}}" range-key="label" value="{{compressLevelIndex}}" bindchange="onCompressChange">
+          <view class="compress-picker" hover-class="hover-tap">{{compressLevels[compressLevelIndex].label}}</view>
+        </picker>
+      </view>
+      <text class="muted">上传前自动压缩图片，降低识别超时概率。选择"高清"可获得更好的审核查看效果。</text>
     </view>
 
     <view class="field">

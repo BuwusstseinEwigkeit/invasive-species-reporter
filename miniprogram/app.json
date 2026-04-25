@@ -9,7 +9,8 @@
     "pages/approved-reports/approved-reports",
     "pages/login/login",
     "pages/profile/profile",
-    "pages/shop/shop"
+    "pages/shop/shop",
+    "pages/notifications/notifications"
   ],
   "window": {
     "navigationBarTitleText": "外来物种哨点",

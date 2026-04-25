@@ -90,9 +90,12 @@ function request(path, options) {
           resolve(res.data);
           return;
         }
-        reject(new Error((res.data && res.data.message) || "HTTP " + res.statusCode));
+        var msg = (res.data && (res.data.error || res.data.message)) || "HTTP " + res.statusCode;
+        wx.showToast({ title: msg, icon: "none" });
+        reject(new Error(msg));
       },
       fail: function (error) {
+        wx.showToast({ title: "网络请求失败，请检查网络连接", icon: "none" });
         reject(error);
       }
     });
@@ -112,12 +115,18 @@ function uploadImage(filePath) {
             resolve(data);
             return;
           }
-          reject(new Error((data && data.message) || "HTTP " + res.statusCode));
+          var msg = (data && (data.error || data.message)) || "HTTP " + res.statusCode;
+          wx.showToast({ title: msg, icon: "none" });
+          reject(new Error(msg));
         } catch (error) {
+          wx.showToast({ title: "上传解析失败", icon: "none" });
           reject(error);
         }
       },
-      fail: reject
+      fail: function (err) {
+        wx.showToast({ title: "上传请求失败", icon: "none" });
+        reject(err);
+      }
     });
   });
 }
@@ -175,6 +184,11 @@ function getReports(status) {
   return request("/api/reports" + query);
 }
 
+function getMyReports(status) {
+  var query = status ? "?status=" + status : "";
+  return request("/api/reports/my" + query);
+}
+
 function createReport(data) {
   return request("/api/reports", {
     method: "POST",
@@ -196,6 +210,18 @@ function register(username, password) {
   return request("/api/auth/register", {
     method: "POST",
     data: { username: username, password: password }
+  }).then(function (res) {
+    if (res.item && res.item.token) {
+      setToken(res.item.token);
+    }
+    return res;
+  });
+}
+
+function wxLogin(code) {
+  return request("/api/auth/wx-login", {
+    method: "POST",
+    data: { code: code }
   }).then(function (res) {
     if (res.item && res.item.token) {
       setToken(res.item.token);
@@ -243,6 +269,20 @@ function getMyRole() {
   return "";
 }
 
+// --- Notifications ---
+
+function getNotifications(userId) {
+  return request("/api/notifications/" + userId);
+}
+
+function markNotificationRead(id) {
+  return request("/api/notifications/" + id + "/read", { method: "POST" });
+}
+
+function markAllNotificationsRead(userId) {
+  return request("/api/notifications/" + userId + "/read-all", { method: "POST" });
+}
+
 // --- Points ---
 
 function getPoints(userId) {
@@ -266,6 +306,44 @@ function getPurchases(userId) {
   return request("/api/shop/purchases/" + userId);
 }
 
+function exportCsv() {
+  var baseUrl = app.globalData.apiBaseUrl || "";
+  var token = getToken();
+  var url = baseUrl + "/api/reports/export/csv";
+  if (token) {
+    url += "?token=" + encodeURIComponent(token);
+  }
+  return new Promise(function (resolve, reject) {
+    wx.downloadFile({
+      url: url,
+      header: token ? { Authorization: "Bearer " + token } : {},
+      success: function (res) {
+        if (res.statusCode === 200) {
+          wx.saveFile({
+            tempFilePath: res.tempFilePath,
+            success: function (saveRes) {
+              wx.showToast({ title: "导出成功", icon: "success" });
+              resolve(saveRes.savedFilePath);
+            },
+            fail: function () {
+              // If save fails, still consider download a success
+              wx.showToast({ title: "下载完成", icon: "success" });
+              resolve(res.tempFilePath);
+            }
+          });
+        } else {
+          wx.showToast({ title: "导出失败", icon: "none" });
+          reject(new Error("Export failed with status " + res.statusCode));
+        }
+      },
+      fail: function (err) {
+        wx.showToast({ title: "导出请求失败", icon: "none" });
+        reject(err);
+      }
+    });
+  });
+}
+
 module.exports = {
   uploadImage: uploadImage,
   startRecognition: startRecognition,
@@ -274,10 +352,12 @@ module.exports = {
   getSpecies: getSpecies,
   getSpeciesDetail: getSpeciesDetail,
   getReports: getReports,
+  getMyReports: getMyReports,
   createReport: createReport,
   reviewReport: reviewReport,
   login: login,
   register: register,
+  wxLogin: wxLogin,
   setToken: setToken,
   getToken: getToken,
   clearToken: clearToken,
@@ -285,9 +365,13 @@ module.exports = {
   getMyUsername: getMyUsername,
   getMyRole: getMyRole,
   getPoints: getPoints,
+  getNotifications: getNotifications,
+  markNotificationRead: markNotificationRead,
+  markAllNotificationsRead: markAllNotificationsRead,
   getProducts: getProducts,
   purchaseProduct: purchaseProduct,
   getPurchases: getPurchases,
   resolveImageUrl: resolveImageUrl,
-  downloadImage: downloadImage
+  downloadImage: downloadImage,
+  exportCsv: exportCsv
 };

@@ -8,6 +8,7 @@ Page({
     accordion: {
       summary: true,
       harm: false,
+      control: false,
       suggestion: false
     }
   },
@@ -40,6 +41,20 @@ Page({
       var res = await api.getSpeciesDetail(id);
       var species = res.item;
 
+      // Convert Chinese riskLevel to CSS-safe class name
+      if (species && species.riskLevel) {
+        var riskMap = { "高": "high", "中": "medium", "低": "low" };
+        species.riskClass = riskMap[species.riskLevel] || "medium";
+      }
+
+      // Convert Chinese relation types to CSS-safe class names
+      if (species && species.relations && species.relations.length) {
+        var typeMap = { "天敌": "predator", "共生": "symbiotic", "类似": "similar" };
+        for (var i = 0; i < species.relations.length; i++) {
+          species.relations[i].typeClass = typeMap[species.relations[i].type] || "other";
+        }
+      }
+
       // Set data immediately so the page renders, then try cover image async
       this.setData({
         item: species,
@@ -61,5 +76,13 @@ Page({
         icon: "none"
       });
     }
+  },
+
+  openRelationSpecies(e) {
+    var sid = e.currentTarget.dataset.sid;
+    if (!sid || sid === "null" || sid === "undefined") return;
+    wx.navigateTo({
+      url: "/pages/detail/detail?id=" + sid
+    });
   }
 });

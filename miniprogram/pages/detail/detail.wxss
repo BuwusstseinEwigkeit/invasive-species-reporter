@@ -115,3 +115,102 @@
   border-radius: 999rpx;
   font-size: 22rpx;
 }
+
+/* --- Info grid --- */
+.info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16rpx;
+  background: #f0f5ee;
+  border-radius: 18rpx;
+  padding: 24rpx;
+  margin-top: 16rpx;
+  margin-bottom: 8rpx;
+}
+
+.info-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 6rpx;
+}
+
+.info-label {
+  font-size: 22rpx;
+  color: #6b786b;
+}
+
+.info-value {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #1f2a1f;
+}
+
+.risk-high {
+  color: #c0392b;
+}
+
+.risk-medium {
+  color: #e08a2e;
+}
+
+/* --- Knowledge graph --- */
+.knowledge-card {
+  margin-top: 24rpx;
+}
+
+.section-title-row {
+  margin-bottom: 16rpx;
+}
+
+.relation-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+}
+
+.relation-node {
+  width: calc(50% - 8rpx);
+  background: #f7faf6;
+  border-radius: 16rpx;
+  padding: 16rpx;
+  box-sizing: border-box;
+  cursor: pointer;
+}
+
+.relation-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 8rpx;
+  padding: 6rpx 14rpx;
+  border-radius: 999rpx;
+  font-size: 24rpx;
+  margin-bottom: 8rpx;
+}
+
+.type-predator {
+  background: #fde8e8;
+  color: #c0392b;
+}
+
+.type-symbiotic {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.type-similar {
+  background: #fff3e0;
+  color: #e65100;
+}
+
+.relation-type {
+  font-weight: 700;
+}
+
+.relation-name {
+  font-weight: 500;
+}
+
+.relation-desc {
+  font-size: 22rpx;
+  display: block;
+}

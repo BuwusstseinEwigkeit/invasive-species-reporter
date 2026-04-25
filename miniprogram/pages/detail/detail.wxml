@@ -7,11 +7,29 @@
   <view class="card detail-card">
     <text class="title">{{item.chineseName}}</text>
     <text class="latin">{{item.latinName}}</text>
-    <text class="meta">类别：{{item.category}} · 风险等级：{{item.riskLevel}}</text>
+
+    <view class="info-grid">
+      <view class="info-cell">
+        <text class="info-label">类别</text>
+        <text class="info-value">{{item.category}}</text>
+      </view>
+      <view class="info-cell">
+        <text class="info-label">入侵等级</text>
+        <text class="info-value risk-{{item.riskClass}}">{{item.riskLevel}}风险</text>
+      </view>
+      <view class="info-cell" wx:if="{{item.origin}}">
+        <text class="info-label">原产地</text>
+        <text class="info-value">{{item.origin}}</text>
+      </view>
+      <view class="info-cell">
+        <text class="info-label">数据来源</text>
+        <text class="info-value">AI+审核</text>
+      </view>
+    </view>
 
     <view class="accordion-block">
       <view class="accordion-header" hover-class="hover-tap" bindtap="toggleAccordion" data-key="summary">
-        <text class="block-title">简介</text>
+        <text class="block-title">物种简介</text>
         <view class="arrow {{accordion.summary ? 'arrow-down' : ''}}"></view>
       </view>
       <view class="accordion-body {{accordion.summary ? '' : 'hidden'}}">
@@ -21,7 +39,7 @@
 
     <view class="accordion-block">
       <view class="accordion-header" hover-class="hover-tap" bindtap="toggleAccordion" data-key="harm">
-        <text class="block-title">主要危害</text>
+        <text class="block-title">生态危害</text>
         <view class="arrow {{accordion.harm ? 'arrow-down' : ''}}"></view>
       </view>
       <view class="accordion-body {{accordion.harm ? '' : 'hidden'}}">
@@ -29,13 +47,44 @@
       </view>
     </view>
 
+    <view class="accordion-block" wx:if="{{item.controlMethods}}">
+      <view class="accordion-header" hover-class="hover-tap" bindtap="toggleAccordion" data-key="control">
+        <text class="block-title">防治方法</text>
+        <view class="arrow {{accordion.control ? 'arrow-down' : ''}}"></view>
+      </view>
+      <view class="accordion-body {{accordion.control ? '' : 'hidden'}}">
+        <text class="muted">{{item.controlMethods}}</text>
+      </view>
+    </view>
+
     <view class="accordion-block">
       <view class="accordion-header" hover-class="hover-tap" bindtap="toggleAccordion" data-key="suggestion">
-        <text class="block-title">建议</text>
+        <text class="block-title">上报建议</text>
         <view class="arrow {{accordion.suggestion ? 'arrow-down' : ''}}"></view>
       </view>
       <view class="accordion-body {{accordion.suggestion ? '' : 'hidden'}}">
         <text class="muted">{{item.suggestion}}</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="card knowledge-card" wx:if="{{item.relations && item.relations.length}}">
+    <view class="section-title-row">
+      <text class="section-title">生态关系图谱</text>
+    </view>
+    <view class="relation-list">
+      <view
+        class="relation-node"
+        wx:for="{{item.relations}}"
+        wx:key="speciesId"
+        data-sid="{{item.speciesId}}"
+        bindtap="openRelationSpecies"
+      >
+        <view class="relation-tag type-{{item.typeClass}}">
+          <text class="relation-type">{{item.type}}</text>
+          <text class="relation-name">{{item.name}}</text>
+        </view>
+        <text class="relation-desc muted">{{item.desc}}</text>
       </view>
     </view>
   </view>

@@ -1,4 +1,5 @@
 .map-shell {
+  position: relative;
   display: flex;
   flex-direction: column;
   height: 100vh;
@@ -99,4 +100,45 @@
   border-radius: 999rpx;
   font-size: 22rpx;
   padding: 10rpx 16rpx;
+}
+
+/* --- Heatmap toggle --- */
+.map-overlay-buttons {
+  position: absolute;
+  top: 20rpx;
+  right: 20rpx;
+  z-index: 10;
+}
+
+.heatmap-btn {
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 50%;
+  width: 88rpx;
+  height: 88rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.15);
+  cursor: pointer;
+}
+
+.heatmap-active {
+  background: #305d3c;
+}
+
+.heatmap-btn-icon {
+  font-size: 30rpx;
+  line-height: 1;
+}
+
+.heatmap-btn-label {
+  font-size: 20rpx;
+  color: #666;
+  line-height: 1;
+  margin-top: 4rpx;
+}
+
+.heatmap-active .heatmap-btn-label {
+  color: #fff;
 }
