@@ -232,11 +232,11 @@ test_csv_export() {
 
 # TC-13: 图片上传
 test_image_upload() {
-  # 创建一个简单的测试图片（1x1 PNG）
-  # Windows: 使用 AppData/Local/Temp 或当前目录
-  TEST_IMAGE="$PROJECT_ROOT/test_image_temp.png"
+  # 创建测试图片到项目目录（不会被 git 跟踪）
+  # 使用绝对路径确保兼容性
+  local TEST_IMAGE="C:/Users/admin/source/repos/invasive-species-reporter/test_upload.png"
 
-  # 创建有效 PNG 图片
+  # 使用 Node.js 创建有效 PNG 图片
   node -e "
 const fs = require('fs');
 const pngData = Buffer.from([
@@ -250,12 +250,13 @@ const pngData = Buffer.from([
   0xD4, 0xEF, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45,
   0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82
 ]);
-fs.writeFileSync('$TEST_IMAGE', pngData);
-" 2>/dev/null || {
-    # Fallback: 直接用 Node.js 写二进制
-    echo "Fallback creation"
-    return 1
-  }
+fs.writeFileSync('C:/Users/admin/source/repos/invasive-species-reporter/test_upload.png', pngData);
+"
+
+  if [ ! -f "$TEST_IMAGE" ]; then
+    test_result "fail" "图片上传" "测试图片创建失败"
+    return
+  fi
 
   RESPONSE=$(curl -s -X POST "$SERVER_URL/api/uploads" -F "image=@$TEST_IMAGE")
 
