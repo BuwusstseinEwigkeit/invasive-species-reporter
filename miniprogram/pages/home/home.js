@@ -149,5 +149,10 @@ Page({
   onPullDownRefresh() {
     this.loadData();
     wx.stopPullDownRefresh();
+  },
+
+  loadMoreSpecies() {
+    // Show hint that all species are loaded
+    wx.showToast({ title: "已加载全部 " + this.data.species.length + " 种物种", icon: "none", duration: 1500 });
   }
 });

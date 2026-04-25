@@ -1,5 +1,5 @@
 <view class="page-shell">
-  <scroll-view scroll-y enable-back-to-top>
+  <scroll-view scroll-y enable-back-to-top lower-threshold="100" bindscrolltolower="loadMoreSpecies">
   <view class="hero card">
     <view class="hero-topline">
       <text class="hero-kicker">公众参与式监测</text>
@@ -22,7 +22,7 @@
     </view>
   </view>
 
-<view class="card" wx:if="{{stats}}">
+  <view class="card" wx:if="{{stats}}">
     <view class="section-header" hover-class="hover-tap" bindtap="toggleStats">
       <text class="section-title">当前概况</text>
       <view class="arrow {{statsCollapsed ? '' : 'arrow-down'}}"></view>
@@ -51,7 +51,7 @@
 
   <view class="card">
     <view class="section-header" hover-class="hover-tap" bindtap="toggleSpecies">
-      <text class="section-title">重点物种</text>
+      <text class="section-title">重点物种（{{species.length}}）</text>
       <view class="arrow {{speciesCollapsed ? '' : 'arrow-down'}}"></view>
     </view>
     <view class="collapse-body {{speciesCollapsed ? 'hidden' : ''}}">
@@ -79,5 +79,6 @@
         </view>
       </view>
     </view>
+  </view>
   </scroll-view>
 </view>
