@@ -25,6 +25,7 @@
     </view>
 
     <view class="panel-header">
+      <image class="panel-header-decor" src="/images/map-decor.png" mode="aspectFill" />
       <text class="section-title">已核实点位</text>
       <view class="panel-toggle" hover-class="hover-tap" bindtap="togglePanel">
         <view class="arrow {{panelCollapsed ? '' : 'arrow-down'}}"></view>

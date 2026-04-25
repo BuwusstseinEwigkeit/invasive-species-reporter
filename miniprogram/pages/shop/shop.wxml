@@ -1,6 +1,6 @@
 <view class="page-shell">
   <!-- Shop banner -->
-  <image class="shop-banner-img" src="/images/shop-card-reward.png" mode="aspectFill" />
+  <image class="shop-banner-img" src="/images/shop-banner.png" mode="aspectFill" />
   <view class="card shop-header">
     <text class="section-title">积分商城</text>
     <text class="muted">用上报和审核获得的积分兑换奖励。</text>

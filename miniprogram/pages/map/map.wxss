@@ -42,10 +42,30 @@
 }
 
 .panel-header {
+  position: relative;
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 20rpx;
+  overflow: hidden;
+  border-radius: 16rpx;
+}
+
+.panel-header-decor {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  opacity: 0.15;
+  border-radius: 16rpx;
+}
+
+.panel-header .section-title {
+  position: relative;
+  z-index: 1;
+  margin-bottom: 0;
 }
 
 .panel-header .section-title {

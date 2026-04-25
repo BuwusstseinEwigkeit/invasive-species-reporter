@@ -13,7 +13,7 @@
     <!-- User card -->
     <view class="card user-card">
       <view class="user-avatar-wrap">
-        <image class="user-avatar-img" src="/images/badge-contributor.png" mode="aspectFill" />
+        <image class="user-avatar-img" src="/images/avatar-placeholder.png" mode="aspectFill" />
         <view class="user-avatar-badge">{{username.slice(0, 1).toUpperCase()}}</view>
       </view>
       <view class="user-info">
