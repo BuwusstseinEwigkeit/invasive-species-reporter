@@ -1,5 +1,13 @@
 .shop-header {
+  margin-top: 16rpx;
   margin-bottom: 24rpx;
+}
+
+.shop-banner-img {
+  width: 100%;
+  height: 320rpx;
+  border-radius: 24rpx;
+  display: block;
 }
 
 .points-badge {
