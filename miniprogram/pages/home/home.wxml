@@ -1,5 +1,5 @@
 <view class="home-page-shell">
-  <!-- Hero: fixed at top, never scrolls -->
+  <!-- Hero: fixed at top -->
   <view class="hero card">
     <view class="hero-topline">
       <text class="hero-kicker">公众参与式监测</text>
@@ -22,7 +22,7 @@
     </view>
   </view>
 
-  <!-- Stats: fixed, below hero -->
+  <!-- Stats -->
   <view class="card stats-card" wx:if="{{stats}}">
     <view class="section-header" hover-class="hover-tap" bindtap="toggleStats">
       <text class="section-title">当前概况</text>
@@ -50,38 +50,77 @@
     </view>
   </view>
 
-  <!-- Species list: JS-calculated height, always scrolls -->
-  <scroll-view scroll-y enable-back-to-top lower-threshold="100" bindscrolltolower="loadMoreSpecies" class="species-scroll" style="height: {{scrollHeight}}px;">
-    <view class="card species-card">
-      <view class="section-header" hover-class="hover-tap" bindtap="toggleSpecies">
-        <text class="section-title">重点物种（{{species.length}}）</text>
-        <view class="arrow {{speciesCollapsed ? '' : 'arrow-down'}}"></view>
-      </view>
-      <view class="collapse-body {{speciesCollapsed ? 'hidden' : ''}}">
+  <!-- Species list with category tabs -->
+  <view class="species-section">
+    <view class="section-header" hover-class="hover-tap" bindtap="toggleSpecies">
+      <text class="section-title">重点物种（{{filteredSpecies.length}}）</text>
+      <view class="arrow {{speciesCollapsed ? '' : 'arrow-down'}}"></view>
+    </view>
+
+    <!-- Category tabs -->
+    <scroll-view scroll-x class="cat-tabs" wx:if="{{!speciesCollapsed}}">
+      <view class="cat-tabs-inner">
         <view
-          class="species-row"
-          hover-class="hover-bg"
-          wx:for="{{species}}"
-          wx:key="id"
+          class="cat-tab {{activeCategory === '全部' ? 'cat-active' : ''}}"
+          bindtap="setCategory"
+          data-cat="全部"
+        >全部</view>
+        <view
+          class="cat-tab {{activeCategory === '植物' ? 'cat-active' : ''}}"
+          bindtap="setCategory"
+          data-cat="植物"
+        >植物</view>
+        <view
+          class="cat-tab {{activeCategory === '动物' ? 'cat-active' : ''}}"
+          bindtap="setCategory"
+          data-cat="动物"
+        >动物</view>
+        <view
+          class="cat-tab {{activeCategory === '昆虫' ? 'cat-active' : ''}}"
+          bindtap="setCategory"
+          data-cat="昆虫"
+        >昆虫</view>
+        <view
+          class="cat-tab {{activeCategory === '鱼类' ? 'cat-active' : ''}}"
+          bindtap="setCategory"
+          data-cat="鱼类"
+        >鱼类</view>
+        <view
+          class="cat-tab {{activeCategory === '植物病害' ? 'cat-active' : ''}}"
+          bindtap="setCategory"
+          data-cat="植物病害"
+        >植物病害</view>
+      </view>
+    </scroll-view>
+
+    <!-- Species list: use plain view with overflow for reliable scrolling -->
+    <scroll-view scroll-y enable-back-to-top class="species-scroll" wx:if="{{!speciesCollapsed}}">
+      <view
+        class="species-row"
+        hover-class="hover-bg"
+        wx:for="{{filteredSpecies}}"
+        wx:key="id"
+        data-id="{{item.id}}"
+        bindtap="openDetail"
+      >
+        <image
+          wx:if="{{item.avatar}}"
+          class="species-avatar"
+          src="{{item.avatar}}"
+          mode="aspectFill"
           data-id="{{item.id}}"
           bindtap="openDetail"
-        >
-          <image
-            wx:if="{{item.avatar}}"
-            class="species-avatar"
-            src="{{item.avatar}}"
-            mode="aspectFill"
-            data-id="{{item.id}}"
-            bindtap="openDetail"
-          />
-          <view wx:else class="species-badge" data-id="{{item.id}}" bindtap="openDetail">{{item.category}}</view>
-          <view class="species-copy" data-id="{{item.id}}" bindtap="openDetail">
-            <text class="species-name">{{item.chineseName}}</text>
-            <text class="muted">{{item.latinName}}</text>
-            <text class="risk-line">风险等级：{{item.riskLevel}}</text>
-          </view>
+        />
+        <view wx:else class="species-badge" data-id="{{item.id}}" bindtap="openDetail">{{item.category}}</view>
+        <view class="species-copy" data-id="{{item.id}}" bindtap="openDetail">
+          <text class="species-name">{{item.chineseName}}</text>
+          <text class="muted">{{item.latinName}}</text>
+          <text class="risk-line">风险等级：{{item.riskLevel}}</text>
         </view>
       </view>
-    </view>
-  </scroll-view>
+      <view class="load-more-hint" wx:if="{{filteredSpecies.length >= species.length}}">
+        <text class="muted">— 已加载全部 {{species.length}} 种重点物种 —</text>
+      </view>
+    </scroll-view>
+  </view>
 </view>

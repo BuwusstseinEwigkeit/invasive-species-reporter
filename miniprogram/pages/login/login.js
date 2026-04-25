@@ -6,7 +6,7 @@ Page({
     password: "",
     error: "",
     submitting: false,
-    showPassword: false
+    showPassword: true
   },
 
   onUsernameInput(e) {

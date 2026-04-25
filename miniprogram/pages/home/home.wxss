@@ -1,16 +1,15 @@
-/* Home page: page-shell provides padding, flex column fills screen */
+/* Home page: flex column fills viewport */
 .home-page-shell {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  /* NO overflow:hidden — lets scroll-view handle its own scroll */
+  overflow: hidden;
 }
 
 .hero {
   background: linear-gradient(145deg, #284d34, #88a56d);
   color: #ffffff;
   margin-bottom: 24rpx;
-  /* Hero height is auto based on content */
   flex-shrink: 0;
 }
 
@@ -84,10 +83,9 @@
   margin-top: 24rpx;
 }
 
-/* Stats card: auto height, flex-shrink prevents crushing */
 .stats-card {
   flex-shrink: 0;
-  margin-bottom: 24rpx;
+  margin-bottom: 16rpx;
 }
 
 .stats-grid {
@@ -109,15 +107,69 @@
   color: #305d3c;
 }
 
-/* Species scroll: JS-calculated height, flex-grow fills remaining */
-.species-scroll {
+/* Species section: fills remaining space with flex column */
+.species-section {
   flex: 1;
-  /* height set via JS: style="height: {{scrollHeight}}px" */
-  min-height: 0; /* critical: allows flex child to shrink */
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
-.species-card {
-  /* card provides padding and shadow */
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+  cursor: pointer;
+  user-select: none;
+}
+
+.section-header .section-title {
+  margin-bottom: 0;
+}
+
+/* Category tabs: horizontal scroll, fixed height */
+.cat-tabs {
+  flex-shrink: 0;
+  white-space: nowrap;
+  height: 72rpx;
+  margin-bottom: 12rpx;
+}
+
+.cat-tabs-inner {
+  display: inline-flex;
+  gap: 16rpx;
+  padding: 0 4rpx;
+  align-items: center;
+  height: 72rpx;
+}
+
+.cat-tab {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 24rpx;
+  height: 56rpx;
+  background: #f0f4ed;
+  color: #305d3c;
+  border-radius: 28rpx;
+  font-size: 26rpx;
+  font-weight: 500;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.cat-tab.cat-active {
+  background: #305d3c;
+  color: #ffffff;
+  font-weight: 700;
+}
+
+/* Species scroll: fills all remaining space */
+.species-scroll {
+  flex: 1;
+  min-height: 0;
+  height: 0; /* required for flex child to shrink below content size */
 }
 
 .species-row {
@@ -168,4 +220,10 @@
 .risk-line {
   color: #305d3c;
   font-size: 25rpx;
+}
+
+.load-more-hint {
+  text-align: center;
+  padding: 32rpx 0;
+  font-size: 24rpx;
 }

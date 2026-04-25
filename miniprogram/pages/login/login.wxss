@@ -1,7 +1,7 @@
 .login-shell {
   display: flex;
   justify-content: center;
-  padding-top: 120rpx;
+  padding-top: 80rpx;
   background: linear-gradient(180deg, #f7f4ea 0%, #eef4eb 100%);
   min-height: 100vh;
 }
@@ -10,8 +10,8 @@
   width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 32rpx;
-  padding: 60rpx 48rpx;
+  gap: 28rpx;
+  padding: 48rpx 40rpx;
   background: #ffffff;
   border-radius: 32rpx;
   margin: 0 32rpx;
@@ -21,7 +21,7 @@
 .login-brand {
   display: block;
   text-align: center;
-  font-size: 56rpx;
+  font-size: 52rpx;
   font-weight: 800;
   color: #284d34;
   letter-spacing: 2rpx;
@@ -30,23 +30,23 @@
 .login-subtitle {
   display: block;
   text-align: center;
-  font-size: 26rpx;
+  font-size: 24rpx;
   color: #6b786b;
-  margin-bottom: 16rpx;
+  margin-top: -8rpx;
   letter-spacing: 4rpx;
 }
 
 .field {
   display: flex;
   flex-direction: column;
-  gap: 12rpx;
+  gap: 10rpx;
 }
 
 .field-label {
   font-size: 26rpx;
   font-weight: 600;
   color: #3d5a3d;
-  padding-left: 8rpx;
+  padding-left: 4rpx;
 }
 
 .password-wrap {
@@ -56,14 +56,14 @@
 .login-input {
   width: 100%;
   background: #f8f9f6;
-  border: 2rpx solid #e4e8de;
+  border: 2rpx solid #dde4d8;
   border-radius: 16rpx;
-  padding: 28rpx 24rpx;
-  padding-right: 80rpx;
+  padding: 26rpx 80rpx 26rpx 24rpx;
   box-sizing: border-box;
   font-size: 30rpx;
   color: #1f2a1f;
-  transition: border-color 0.2s;
+  caret-color: #305d3c;
+  transition: border-color 0.2s, background 0.2s;
 }
 
 .login-input::placeholder {
@@ -73,32 +73,36 @@
 .login-input:focus {
   border-color: #305d3c;
   background: #ffffff;
+  outline: none;
+}
+
+.password-input {
+  padding-right: 80rpx;
 }
 
 .pwd-toggle {
   position: absolute;
-  right: 24rpx;
+  right: 20rpx;
   top: 50%;
   transform: translateY(-50%);
-  font-size: 36rpx;
+  font-size: 38rpx;
   line-height: 1;
   padding: 8rpx;
-  z-index: 1;
 }
 
 .login-actions {
   display: flex;
   flex-direction: column;
-  gap: 20rpx;
-  margin-top: 16rpx;
+  gap: 16rpx;
+  margin-top: 8rpx;
 }
 
 .primary-button {
   background: linear-gradient(135deg, #284d34, #305d3c);
   color: #ffffff;
   border-radius: 16rpx;
-  height: 96rpx;
-  font-size: 32rpx;
+  height: 88rpx;
+  font-size: 30rpx;
   font-weight: 600;
   border: none;
 }
@@ -111,8 +115,8 @@
   background: #f0f4ed;
   color: #305d3c;
   border-radius: 16rpx;
-  height: 96rpx;
-  font-size: 30rpx;
+  height: 88rpx;
+  font-size: 28rpx;
   font-weight: 500;
   border: 2rpx solid #d4ddd0;
 }
@@ -128,51 +132,54 @@
   color: #9e9e9e;
 }
 
+.error-box {
+  background: #fef2f2;
+  border-radius: 12rpx;
+  padding: 16rpx 20rpx;
+}
+
 .error-text {
   display: block;
   text-align: center;
   color: #c0392b;
   font-size: 26rpx;
-  padding: 16rpx;
-  background: #fef2f2;
-  border-radius: 12rpx;
 }
 
 .demo-hint {
-  margin-top: 16rpx;
-  padding-top: 24rpx;
+  margin-top: 8rpx;
+  padding: 20rpx;
   border-top: 1rpx solid #ece8da;
-  text-align: center;
+  border-radius: 16rpx;
+  background: #fafaf7;
   display: flex;
   flex-direction: column;
-  gap: 10rpx;
-  background: #fafaf7;
-  border-radius: 16rpx;
-  padding: 20rpx;
+  gap: 8rpx;
 }
 
 .demo-title {
   font-weight: 700;
   color: #305d3c;
   font-size: 24rpx;
+  text-align: center;
   margin-bottom: 4rpx;
 }
 
 .demo-hint .muted {
   font-size: 22rpx;
   color: #6b786b;
+  text-align: center;
 }
 
 /* --- WeChat login --- */
 .wx-login-section {
-  margin-top: 24rpx;
+  margin-top: 8rpx;
 }
 
 .divider-row {
   display: flex;
   align-items: center;
   gap: 20rpx;
-  margin-bottom: 24rpx;
+  margin-bottom: 20rpx;
 }
 
 .divider-line {
@@ -189,11 +196,11 @@
 
 .wx-login-button {
   width: 100%;
-  height: 96rpx;
+  height: 88rpx;
   border-radius: 16rpx;
   background: linear-gradient(135deg, #07c160, #06ad56);
   color: #fff;
-  font-size: 30rpx;
+  font-size: 28rpx;
   font-weight: 600;
   display: flex;
   align-items: center;
@@ -201,7 +208,7 @@
   gap: 12rpx;
   border: none;
   padding: 0;
-  line-height: 96rpx;
+  line-height: 88rpx;
   box-shadow: 0 4rpx 16rpx rgba(7, 193, 96, 0.3);
 }
 
@@ -210,5 +217,5 @@
 }
 
 .wx-icon {
-  font-size: 40rpx;
+  font-size: 36rpx;
 }
