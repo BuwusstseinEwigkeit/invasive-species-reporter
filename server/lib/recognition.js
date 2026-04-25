@@ -298,68 +298,6 @@ async function recognizeWithPython({ filePath, mimeType, speciesList }) {
   };
 }
 
-// --- MiniMax (cloud vision) provider ---
-//
-// MiniMax-VL-3: latest vision-language model, OpenAI-compatible format
-// Docs: https://platform.minimaxi.com/docs/api-reference/text-openai-api
-
-const MINIMAX_API_KEY = process.env.MINIMAX_API_KEY || "";
-const MINIMAX_BASE_URL = process.env.MINIMAX_BASE_URL || "https://api.minimaxi.com/v1/chat/completions";
-const MINIMAX_MODEL = process.env.MINIMAX_MODEL || "MiniMax-VL-3";
-
-async function recognizeWithMiniMax({ imageBuffer, mimeType, speciesList }) {
-  if (!MINIMAX_API_KEY) {
-    throw new Error("MINIMAX_API_KEY is not configured.");
-  }
-
-  const base64Image = `data:${mimeType};base64,${imageBuffer.toString("base64")}`;
-
-  const response = await fetch(MINIMAX_BASE_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${MINIMAX_API_KEY}`
-    },
-    body: JSON.stringify({
-      model: MINIMAX_MODEL,
-      messages: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "text",
-              text: `${buildPrompt(speciesList)}\n\n请识别这张图中的疑似外来物种，并按要求返回 JSON。`
-            },
-            {
-              type: "image_url",
-              image_url: {
-                url: base64Image
-              }
-            }
-          ]
-        }
-      ],
-      temperature: 0.1
-    })
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`MiniMax request failed: ${response.status} ${errorText}`);
-  }
-
-  const payload = await response.json();
-  const parsed = extractJson(extractTextFromResponse(payload));
-
-  return {
-    matchedSpeciesId: parsed.matchedSpeciesId || "",
-    matchedSpeciesName: parsed.matchedSpeciesName || "",
-    confidence: Number(parsed.confidence || 0),
-    summary: parsed.summary || "",
-    topCandidates: Array.isArray(parsed.topCandidates) ? parsed.topCandidates.slice(0, 3) : []
-  };
-}
-
 // --- Moonshot/Kimi (cloud vision) provider ---
 
 const MOONSHOT_API_KEY = process.env.MOONSHOT_API_KEY || "";
@@ -461,9 +399,8 @@ async function recognizeSpeciesFromImage({ filePath, mimeType, speciesList }) {
   const preparedImage = await prepareImageForRecognition(filePath, mimeType);
   const imageBuffer = Buffer.from(preparedImage.base64Data, "base64");
 
-  // Provider chain: MiniMax (primary, most cost-effective) -> Zhipu (cloud) -> Moonshot (cloud fallback) -> Python (Docker microservice) -> Mock
+  // Provider chain: Zhipu (primary) -> Moonshot (cloud fallback) -> Python (Docker microservice) -> Mock
   const providers = [
-    { name: "minimax", fn: recognizeWithMiniMax },
     { name: "zhipu", fn: recognizeWithZhipu }
   ];
 

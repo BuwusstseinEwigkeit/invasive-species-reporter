@@ -1,0 +1,32 @@
+<view class="page-shell">
+  <view class="loading-card" wx:if="{{loading}}">
+    <view class="skeleton-line w80"></view>
+    <view class="skeleton-line w60"></view>
+    <view class="skeleton-line w70"></view>
+  </view>
+
+  <view wx:elif="{{!notifications.length}}" class="empty-state">
+    <text class="empty-icon">🔔</text>
+    <text class="muted">暂无通知</text>
+  </view>
+
+  <view class="notif-list" wx:else>
+    <view class="notif-card {{item.isRead ? 'read' : 'unread'}}"
+      wx:for="{{notifications}}" wx:key="id"
+      data-id="{{item.id}}"
+      bindtap="onTapNotif"
+    >
+      <view class="notif-indicator" wx:if="{{!item.isRead}}"></view>
+      <view class="notif-type-icon">
+        <text wx:if="{{item.type === 'approved'}}">✅</text>
+        <text wx:elif="{{item.type === 'rejected'}}">❌</text>
+        <text wx:else>ℹ️</text>
+      </view>
+      <view class="notif-body">
+        <text class="notif-title">{{item.title}}</text>
+        <text class="notif-desc">{{item.body}}</text>
+        <text class="notif-time">{{item.createdAt}}</text>
+      </view>
+    </view>
+  </view>
+</view>
