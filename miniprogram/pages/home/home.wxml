@@ -1,7 +1,7 @@
 <view class="home-page-shell">
   <!-- Hero: fixed at top with illustrated background -->
   <view class="hero card">
-    <image class="hero-bg-img" src="/images/home-bg.jpg" mode="aspectFill" />
+    <image class="hero-bg-img" src="/images/home-bg.png" mode="aspectFill" />
     <view class="hero-content">
       <view class="hero-topline">
         <text class="hero-kicker">公众参与式监测</text>
