@@ -101,33 +101,74 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function requestRecognition(body) {
+async function requestRecognition(body, signal) {
   let lastError = null;
 
   for (let attempt = 0; attempt < MAX_RETRIES; attempt += 1) {
-    const response = await fetch(DEFAULT_BASE_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.ZHIPU_API_KEY}`
-      },
-      body: JSON.stringify(body)
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-    if (response.ok) {
-      return response.json();
+    try {
+      const response = await fetch(DEFAULT_BASE_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${process.env.ZHIPU_API_KEY}`
+        },
+        body: JSON.stringify(body),
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
+      if (response.ok) {
+        return response.json();
+      }
+
+      const errorText = await response.text();
+
+      // 429: Rate limited - treat as temporary, retry with backoff
+      // 500-599: Server error - retry with backoff
+      // Other: Don't retry (4xx client errors)
+      if (response.status === 429 || response.status >= 500) {
+        lastError = new Error(`Zhipu request failed: ${response.status} ${errorText}`);
+        lastError.statusCode = response.status;
+        lastError.isRetryable = true;
+
+        if (attempt < MAX_RETRIES - 1) {
+          // Check for Retry-After header
+          const retryAfter = response.headers.get("Retry-After");
+          const delay = retryAfter ? parseInt(retryAfter) * 1000 : 1500 * (attempt + 1);
+          console.log(`[recognition] Zhipu retryable error, waiting ${delay}ms before retry ${attempt + 1}/${MAX_RETRIES}`);
+          await sleep(delay);
+          continue;
+        }
+      } else {
+        // 4xx client errors - don't retry
+        lastError = new Error(`Zhipu request failed: ${response.status} ${errorText}`);
+        lastError.statusCode = response.status;
+        lastError.isRetryable = false;
+        throw lastError;
+      }
+    } catch (err) {
+      clearTimeout(timeoutId);
+
+      if (err.name === "AbortError") {
+        lastError = new Error("Zhipu request timeout (30s)");
+        lastError.statusCode = 504;
+        lastError.isRetryable = true;
+      } else {
+        lastError = err;
+        lastError.isRetryable = true;
+      }
+
+      if (lastError.isRetryable && attempt < MAX_RETRIES - 1) {
+        await sleep(500);
+        continue;
+      }
+
+      throw lastError;
     }
-
-    const errorText = await response.text();
-    lastError = new Error(`Zhipu request failed: ${response.status} ${errorText}`);
-    lastError.statusCode = response.status === 429 ? 503 : 502;
-
-    if ((response.status === 429 || response.status >= 500) && attempt < MAX_RETRIES - 1) {
-      await sleep(1500 * (attempt + 1));
-      continue;
-    }
-
-    throw lastError;
   }
 
   throw lastError;
@@ -441,13 +482,24 @@ async function recognizeSpeciesFromImage({ filePath, mimeType, speciesList }) {
       console.error(`[recognition] provider ${provider.name} failed:`, error.message);
       lastError = error;
 
-      // If a provider fails due to missing API key, skip to next provider
+      // Skip to next provider for these cases:
+      // 1. Missing API key - provider not configured
+      // 2. AbortError/timeout - network issue, try next provider
+      // 3. Non-retryable errors (4xx client errors except 429)
       if (error.message.includes("API_KEY is not configured")) {
         console.log(`[recognition] ${provider.name} API key not configured, falling back`);
         continue;
       }
 
-      // For other errors, wait a bit before trying next provider
+      // If error has isRetryable flag, check it
+      if (error.isRetryable === false) {
+        // Non-retryable error (e.g., 4xx client error), don't try other providers for this cause
+        console.log(`[recognition] ${provider.name} returned non-retryable error, giving up`);
+        throw error;
+      }
+
+      // For retryable errors (timeout, 5xx), wait then try next provider
+      console.log(`[recognition] ${provider.name} error is retryable, falling back to next provider`);
       await new Promise(resolve => setTimeout(resolve, 500));
     }
   }
