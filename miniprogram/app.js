@@ -14,12 +14,16 @@ function resolveApiBaseUrl() {
     }
   } catch (_e) { /* ignore */ }
 
-  var systemInfo = {};
+  var platform = "devtools";
   try {
-    systemInfo = wx.getSystemInfoSync() || {};
-  } catch (_e) { /* ignore */ }
-
-  var platform = (systemInfo.platform || "").toLowerCase();
+    var deviceInfo = wx.getDeviceInfo();
+    platform = (deviceInfo.platform || "").toLowerCase();
+  } catch (_e) {
+    try {
+      var systemInfo = wx.getSystemInfoSync() || {};
+      platform = (systemInfo.platform || "").toLowerCase();
+    } catch (_e2) { /* ignore */ }
+  }
   var model = (systemInfo.model || "").toLowerCase();
 
   // PC devtools simulator: use localhost

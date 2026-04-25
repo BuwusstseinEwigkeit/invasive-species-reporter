@@ -3,6 +3,7 @@ var api = require("../../utils/api");
 Page({
   data: {
     products: [],
+    productLocalImages: {},
     points: 0,
     loading: true,
     buying: false,
@@ -28,9 +29,23 @@ Page({
 
       var results = await Promise.all(promises);
       var productsRes = results[0];
+      var products = productsRes.items || [];
+
+      // Download product images locally to avoid HTTP image restriction in WeChat
+      var localImages = {};
+      for (var i = 0; i < products.length; i++) {
+        var p = products[i];
+        if (p.imageUrl) {
+          var localPath = await api.downloadImage(p.imageUrl);
+          if (localPath) {
+            localImages[p.id] = localPath;
+          }
+        }
+      }
 
       this.setData({
-        products: productsRes.items || [],
+        products: products,
+        productLocalImages: localImages,
         points: results.length > 1 ? (results[1].item.total || 0) : 0,
         loading: false
       });

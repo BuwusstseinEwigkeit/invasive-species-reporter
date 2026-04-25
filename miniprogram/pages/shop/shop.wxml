@@ -28,7 +28,7 @@
   <view class="product-grid" wx:else>
     <view class="product-card" wx:for="{{products}}" wx:key="id">
       <view class="product-image">
-        <image wx:if="{{item.imageUrl}}" class="product-img" src="{{item.imageUrl}}" mode="aspectFill" />
+        <image wx:if="{{productLocalImages[item.id]}}" class="product-img" src="{{productLocalImages[item.id]}}" mode="aspectFill" />
         <text wx:else class="product-img-placeholder">{{item.name.slice(0, 1)}}</text>
       </view>
       <view class="product-body">
