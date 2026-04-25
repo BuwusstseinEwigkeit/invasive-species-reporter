@@ -1,7 +1,7 @@
 # 外来物种哨点 — 项目迭代记录
 
 > 记录所有 UX 问题、调试过程、根因分析和解决方案。
-> 最后更新：2026-04-25（本次：全部 20 个物种图片替换为真实照片）
+> 最后更新：2026-04-25（本次：Ollama 本地 vision 接入，识别链优化）
 
 ---
 
@@ -176,8 +176,8 @@ INSERT OR IGNORE INTO species (...) VALUES (...)
 
 | Commit | 描述 |
 |--------|------|
+| `1c1bc6e` | feat: Ollama 本地 vision 模型优先 + 结果校验 |
 | `3d51443` | fix: 替换全部 20 个物种图片为真实照片 |
-| `7c20d79` | fix: 替换 species-013~020 占位图为正确格式 JPEG |
 | `09be8a9` | feat: 添加分类筛选标签页、修复密码显示和列表滚动 |
 | `195a060` | fix: 修复物种列表滚动、登录密码显示、图片500错误 |
 | `f656365` | feat: 改进首页物种列表滚动和加载更多 |
@@ -199,14 +199,28 @@ INSERT OR IGNORE INTO species (...) VALUES (...)
 
 ## 五、本次更新记录（2026-04-25）
 
+### Ollama 本地 vision 模型接入
+
+**问题**：智谱 glm-4.6v-flash 限流严重（code 1305），识别结果不正确。
+
+**解决方案**：
+- 安装 qwen2.5vl:7b（Ollama 本地 vision 模型，支持中文，8.3B 参数）
+- 将 Ollama 提升为第一优先 provider（免费、零延迟、零 API 成本）
+- 添加识别结果校验：返回的 speciesId 必须存在于候选列表，否则自动跳到下一个 provider
+- Prompt 强化约束：严禁虚构物种 ID
+
+**识别链**：Ollama → Zhipu → Moonshot → Python → Mock（兜底）
+
+**验证结果**：测试物种-003.jpg（红耳龟）→ 识别为巴西龟（0.95 置信度，生物分类相近，属正确）
+
+**文件**：`server/lib/recognition.js`、`.env`
+
 ### 物种图片全部替换为真实照片
 
-**现象**：species-013 到 species-020 均为 120×120 2KB 占位图，前 12 个虽有正确格式但也可能需要更新。
+**现象**：species-013 到 species-020 均为 120×120 2KB 占位图。
 
-**解决方案**：从 `server/uploads/species/` 复制全部 20 个真实照片到 `server/static/species/`，统一为 1248×832 真实 JPEG 格式。
-
-**文件**：`server/static/species/species-001~020.jpg`
+**解决方案**：从 `server/uploads/species/` 复制全部 20 个真实照片，统一 1248×832 JPEG 格式。
 
 ### Git 推送状态
 
-本地分支领先 origin/main 10 个 commit，网络不稳定导致推送反复失败（curl 55 / RPC failed）。建议手动在本地执行 `git push origin main`。
+本地分支领先 origin/main 15 个 commit，网络不稳定导致推送反复失败。建议手动在本地执行 `git push origin main`。
