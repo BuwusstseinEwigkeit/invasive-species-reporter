@@ -42,14 +42,15 @@ function buildPrompt(speciesList) {
     .join("\n");
 
   return [
-    "你是外来物种识别助手。",
-    "任务是在给定候选物种列表里判断图片最可能对应的物种，而不是自由发挥。",
-    "如果图片不足以支持判断，也要明确说明，并把 confidence 压低。",
+    "你是外来物种识别助手。你的任务是从以下候选物种列表中，选出图片最可能对应的物种。",
+    "**严禁凭空编造物种 ID 或物种名，必须使用候选列表中的 id 字段。**",
+    "matchedSpeciesId 必须从候选列表的 id 中选择，不可自创。",
+    "如果图片不足以支持判断，把 confidence 压到 0.3 以下，并明确说明原因。",
     "输出必须是严格 JSON，不要 markdown，不要解释。",
     "JSON 结构如下：",
     '{"matchedSpeciesId":"","matchedSpeciesName":"","confidence":0,"summary":"","topCandidates":[{"speciesId":"","speciesName":"","confidence":0}]}',
     "confidence 取 0 到 1 之间的小数。",
-    "topCandidates 最多给 3 个。",
+    "topCandidates 最多给 3 个，且 speciesId 必须来自候选列表。",
     "候选物种列表：",
     options
   ].join("\n");
@@ -440,12 +441,20 @@ async function recognizeSpeciesFromImage({ filePath, mimeType, speciesList }) {
   const preparedImage = await prepareImageForRecognition(filePath, mimeType);
   const imageBuffer = Buffer.from(preparedImage.base64Data, "base64");
 
-  // Provider chain: Zhipu (primary) -> Moonshot (cloud fallback) -> Python (Docker microservice) -> Mock
-  const providers = [
-    { name: "zhipu", fn: recognizeWithZhipu }
-  ];
+  // Provider chain: Ollama (local, free, fast with GPU) -> Zhipu (cloud fallback) -> Moonshot -> Python -> Mock
+  const providers = [];
 
-  // Moonshot/Kimi as first cloud fallback (set MOONSHOT_API_KEY to enable)
+  // Ollama local vision model (set OLLAMA_VISION_MODEL to enable, e.g. qwen2.5vl:7b)
+  if (OLLAMA_VISION_MODEL) {
+    providers.push({ name: "ollama", fn: recognizeWithOllama });
+  }
+
+  // Zhipu cloud API (set ZHIPU_API_KEY to enable)
+  if (process.env.ZHIPU_API_KEY) {
+    providers.push({ name: "zhipu", fn: recognizeWithZhipu });
+  }
+
+  // Moonshot/Kimi as cloud fallback (set MOONSHOT_API_KEY to enable)
   if (MOONSHOT_API_KEY) {
     providers.push({ name: "moonshot", fn: recognizeWithMoonshot });
   }
@@ -453,11 +462,6 @@ async function recognizeSpeciesFromImage({ filePath, mimeType, speciesList }) {
   // Python Docker microservice (set PYTHON_RECOGNITION_URL to enable, e.g. http://localhost:5100)
   if (PYTHON_RECOGNITION_URL) {
     providers.push({ name: "python", fn: recognizeWithPython });
-  }
-
-  // Optional: Ollama local model for dev/testing only (set OLLAMA_VISION_MODEL to enable)
-  if (OLLAMA_VISION_MODEL) {
-    providers.push({ name: "ollama", fn: recognizeWithOllama });
   }
 
   // Always have mock as final fallback
@@ -475,6 +479,21 @@ async function recognizeSpeciesFromImage({ filePath, mimeType, speciesList }) {
       });
 
       if (result.confidence > 0) {
+        // Validate: matchedSpeciesId must exist in speciesList
+        const validIds = new Set(speciesList.map(s => s.id));
+        if (result.matchedSpeciesId && !validIds.has(result.matchedSpeciesId)) {
+          console.warn(`[recognition] provider ${provider.name} returned invalid speciesId "${result.matchedSpeciesId}", falling back to next provider`);
+          lastError = new Error(`Provider ${provider.name} returned invalid speciesId: ${result.matchedSpeciesId}`);
+          continue;
+        }
+        // Also validate topCandidates
+        const validCandidates = result.topCandidates.filter(c => validIds.has(c.speciesId));
+        if (validCandidates.length === 0 && result.topCandidates.length > 0) {
+          console.warn(`[recognition] provider ${provider.name} returned no valid candidates, falling back`);
+          lastError = new Error(`Provider ${provider.name} returned no valid candidates`);
+          continue;
+        }
+        result.topCandidates = validCandidates;
         console.log(`[recognition] provider ${provider.name} succeeded with confidence ${result.confidence}`);
         return result;
       }
