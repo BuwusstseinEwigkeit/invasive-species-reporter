@@ -441,17 +441,17 @@ async function recognizeSpeciesFromImage({ filePath, mimeType, speciesList }) {
   const preparedImage = await prepareImageForRecognition(filePath, mimeType);
   const imageBuffer = Buffer.from(preparedImage.base64Data, "base64");
 
-  // Provider chain: Ollama (local, free, fast with GPU) -> Zhipu (cloud fallback) -> Moonshot -> Python -> Mock
+  // Provider chain: Zhipu (primary) -> Ollama (local fallback) -> Moonshot -> Python -> Mock
   const providers = [];
 
-  // Ollama local vision model (set OLLAMA_VISION_MODEL to enable, e.g. qwen2.5vl:7b)
-  if (OLLAMA_VISION_MODEL) {
-    providers.push({ name: "ollama", fn: recognizeWithOllama });
-  }
-
-  // Zhipu cloud API (set ZHIPU_API_KEY to enable)
+  // Zhipu cloud API (primary, set ZHIPU_API_KEY to enable)
   if (process.env.ZHIPU_API_KEY) {
     providers.push({ name: "zhipu", fn: recognizeWithZhipu });
+  }
+
+  // Ollama local vision model (fallback, set OLLAMA_VISION_MODEL to enable, e.g. qwen2.5vl:7b)
+  if (OLLAMA_VISION_MODEL) {
+    providers.push({ name: "ollama", fn: recognizeWithOllama });
   }
 
   // Moonshot/Kimi as cloud fallback (set MOONSHOT_API_KEY to enable)
