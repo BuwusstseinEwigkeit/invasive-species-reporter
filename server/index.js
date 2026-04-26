@@ -27,7 +27,20 @@ const {
   createPurchase,
   getUserPurchases,
   checkAndAwardAchievements,
-  getAllAchievementsWithStatus
+  getAllAchievementsWithStatus,
+  getUserCredit,
+  updateUserCredit,
+  checkReportLimit,
+  checkImageDuplicate,
+  addImageFingerprint,
+  checkGeotemporalDuplicate,
+  createReportWithPoints,
+  getProductCategories,
+  getUserPrivileges,
+  createPurchaseFull,
+  getOrdersByUser,
+  updateOrderStatus,
+  getLeaderboard
 } = require("./lib/store");
 const { registerUpload, getUpload, removeUpload } = require("./lib/upload-store");
 const { createRecognitionJob, getRecognitionJob } = require("./lib/recognition-jobs");
@@ -571,8 +584,7 @@ app.get("/api/recognitions/:jobId", (req, res) => {
 
 app.post("/api/reports", (req, res) => {
   try {
-    let reportUserId = req.body.userId || "";
-    // Extract userId from JWT if available
+    let reportUserId = "";
     try {
       const token = (req.headers.authorization || "").replace("Bearer ", "");
       if (token) {
@@ -581,21 +593,77 @@ app.post("/api/reports", (req, res) => {
       }
     } catch (_e) { /* ignore */ }
 
-    const report = createReport({ ...req.body, userId: reportUserId });
-    // Award 10 points for submitting a report
-    if (reportUserId && reportUserId !== "user-anonymous") {
-      try {
-        addPoints(reportUserId, 10, "report_submit", report.id);
-        // Check and award achievements
-        const newlyEarned = checkAndAwardAchievements(reportUserId);
-        if (newlyEarned.length > 0) {
-          createNotification(reportUserId, "🏆 获得新成就", `恭喜获得「${newlyEarned[0].name}」成就！`, "achievement", null);
-        }
-      } catch (_e) { /* points award is optional */ }
+    const userId = reportUserId || "user-anonymous";
+
+    // Check daily limit
+    if (userId !== "user-anonymous") {
+      const limit = checkReportLimit(userId);
+      if (!limit.allowed) {
+        sendError(res, `今日上报已达上限（每日${limit.dailyLimit}次），信用分过低请保持良好记录。`, 429);
+        return;
+      }
     }
+
+    const { fileId, latitude, longitude } = req.body || {};
+
+    // Image fingerprint dedup
+    if (fileId) {
+      const uploadRecord = getUpload(fileId);
+      if (uploadRecord) {
+        // compute md5 from file path
+        const fs = require("fs");
+        const crypto = require("crypto");
+        let md5Hash = "";
+        try {
+          const fileBuffer = fs.readFileSync(uploadRecord.path);
+          md5Hash = crypto.createHash("md5").update(fileBuffer).digest("hex");
+        } catch (_e) { /* ignore */ }
+
+        if (md5Hash && checkImageDuplicate(md5Hash)) {
+          sendError(res, "图片重复，请勿重复上传相同图片。", 400);
+          return;
+        }
+        if (md5Hash) {
+          addImageFingerprint(md5Hash, userId, uploadRecord.size, 0, 0);
+        }
+      }
+    }
+
+    // Geotemporal dedup (do not award points if dupe, but still create report)
+    let isDupe = false;
+    if (userId !== "user-anonymous" && latitude && longitude) {
+      isDupe = checkGeotemporalDuplicate(userId, latitude, longitude);
+    }
+
+    const reportPayload = {
+      userId,
+      speciesId: req.body.speciesId,
+      aiTop1: req.body.aiTop1,
+      aiScore: req.body.aiScore,
+      aiCandidates: req.body.aiCandidates,
+      imageUrl: req.body.imageUrl,
+      latitude,
+      longitude,
+      address: req.body.address,
+      remark: req.body.remark,
+      imageFingerprint: ""
+    };
+
+    const result = createReportWithPoints(reportPayload);
+
+    if (userId !== "user-anonymous" && !isDupe) {
+      try {
+        const newlyEarned = checkAndAwardAchievements(userId);
+        if (newlyEarned.length > 0) {
+          createNotification(userId, "🏆 获得新成就", `恭喜获得「${newlyEarned[0].name}」成就！`, "achievement", null);
+        }
+      } catch (_e) { /* optional */ }
+    }
+
     res.status(201).json({
-      item: report,
-      message: "Report created and waiting for review."
+      item: result.report,
+      message: isDupe ? "Report created (duplicate location, no points awarded)." : "Report created and waiting for review.",
+      pointsDelta: isDupe ? [] : result.pointsDelta
     });
   } catch (error) {
     sendError(res, "Invalid JSON body", 400);
@@ -618,27 +686,45 @@ app.post("/api/reports/:id/review", authRequired, reviewerRequired, (req, res) =
       return;
     }
 
-    // Award 50 points when a report is approved
+    // Award points based on action
     if (payload.action === "approved") {
       const report = result.report;
       if (report && report.userId && report.userId !== "user-anonymous") {
         try {
-          addPoints(report.userId, 50, "report_approved", report.id);
-          createNotification(report.userId, "上报已通过审核", `您的上报「${report.aiTop1}」已通过审核，获得 50 积分奖励。`, "approved", report.id);
-          // Check and award achievements
+          // Base +20 for approval
+          addPoints(report.userId, 20, "report_approved", report.id);
+          // High quality bonus (+10) if AI score > 0.95 or reviewer marked it
+          const isHighQuality = report.aiScore > 0.95 || payload.highQuality;
+          if (isHighQuality) {
+            addPoints(report.userId, 10, "high_quality", report.id);
+          }
+          updateUserCredit(report.userId, 2);
+          createNotification(report.userId, "上报已通过审核",
+            `您的上报「${report.aiTop1}」已通过审核${isHighQuality ? "（高质量+10）" : ""}，获得 ${isHighQuality ? 30 : 20} 积分奖励。`,
+            "approved", report.id);
           const newlyEarned = checkAndAwardAchievements(report.userId);
           if (newlyEarned.length > 0) {
             createNotification(report.userId, "🏆 获得新成就", `恭喜获得「${newlyEarned[0].name}」成就！`, "achievement", null);
           }
-        } catch (_e) { /* points award is optional */ }
+        } catch (_e) { /* optional */ }
       }
     } else if (payload.action === "rejected") {
       const report = result.report;
       if (report && report.userId && report.userId !== "user-anonymous") {
         try {
+          updateUserCredit(report.userId, -3);
           const reason = payload.comment ? `原因：${payload.comment}` : "请查看审核意见。";
           createNotification(report.userId, "上报未通过审核", `您的上报「${report.aiTop1}」未通过审核。${reason}`, "rejected", report.id);
-        } catch (_e) { /* notification is optional */ }
+        } catch (_e) { /* optional */ }
+      }
+    } else if (payload.action === "spam") {
+      const report = result.report;
+      if (report && report.userId && report.userId !== "user-anonymous") {
+        try {
+          addPoints(report.userId, -10, "report_spam", report.id);
+          updateUserCredit(report.userId, -10);
+          createNotification(report.userId, "⚠️ 上报被标记为无效", `您的上报「${report.aiTop1}」被判定为垃圾上报，积分-10，信用分-10。`, "rejected", report.id);
+        } catch (_e) { /* optional */ }
       }
     }
 
@@ -679,16 +765,19 @@ app.post("/api/points/:userId", authRequired, (req, res) => {
 // --- Shop routes ---
 
 app.get("/api/shop/products", (_req, res) => {
-  res.json({ items: getProducts() });
+  const items = getProducts();
+  const categories = getProductCategories();
+  res.json({ items, categories });
 });
 
 app.post("/api/shop/purchase", authRequired, (req, res) => {
-  const { productId } = req.body || {};
+  const { productId, shippingName, shippingPhone, shippingAddress } = req.body || {};
   if (!productId) {
     sendError(res, "Product ID is required.", 400);
     return;
   }
-  const result = createPurchase(req.user.userId, productId);
+  const shippingInfo = { name: shippingName, phone: shippingPhone, address: shippingAddress };
+  const result = createPurchaseFull(req.user.userId, productId, shippingInfo);
   if (result.error) {
     sendError(res, result.error, 400);
     return;
@@ -698,6 +787,14 @@ app.post("/api/shop/purchase", authRequired, (req, res) => {
 
 app.get("/api/shop/purchases/:userId", (req, res) => {
   res.json({ items: getUserPurchases(req.params.userId) });
+});
+
+app.get("/api/shop/orders/:userId", authRequired, (req, res) => {
+  if (req.user.userId !== req.params.userId) {
+    sendError(res, "Access denied.", 403);
+    return;
+  }
+  res.json({ items: getOrdersByUser(req.params.userId) });
 });
 
 // --- Notification routes ---
@@ -740,6 +837,26 @@ app.get("/api/achievements", authRequired, (req, res) => {
 app.post("/api/achievements/check", authRequired, (req, res) => {
   const newlyEarned = checkAndAwardAchievements(req.user.userId);
   res.json({ items: newlyEarned });
+});
+
+// --- User privileges ---
+
+app.get("/api/user/privileges", authRequired, (req, res) => {
+  const credit = getUserCredit(req.user.userId);
+  const privileges = getUserPrivileges(req.user.userId);
+  res.json({ item: { credit, ...privileges } });
+});
+
+// --- Leaderboard ---
+
+app.get("/api/leaderboard", (_req, res) => {
+  const type = (_req.query.type || "weekly") ;
+  if (!["weekly", "total", "newcomer"].includes(type)) {
+    sendError(res, "type must be weekly/total/newcomer", 400);
+    return;
+  }
+  const items = getLeaderboard(type, 50);
+  res.json({ items });
 });
 
 // --- Error handler ---

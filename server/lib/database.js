@@ -99,7 +99,11 @@ function initSchema() {
       description TEXT,
       points_cost INTEGER NOT NULL,
       image_url TEXT,
-      stock INTEGER DEFAULT 999
+      stock INTEGER DEFAULT 999,
+      category_id TEXT DEFAULT 'cat-digital',
+      is_virtual INTEGER DEFAULT 1,
+      requirement TEXT DEFAULT '',
+      sort_order INTEGER DEFAULT 0
     );
 
     CREATE TABLE IF NOT EXISTS purchases (
@@ -109,8 +113,52 @@ function initSchema() {
       created_at TEXT DEFAULT (datetime('now'))
     );
 
+    CREATE TABLE IF NOT EXISTS orders (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      product_id TEXT NOT NULL,
+      status TEXT DEFAULT 'pending',
+      shipping_name TEXT DEFAULT '',
+      shipping_phone TEXT DEFAULT '',
+      shipping_address TEXT DEFAULT '',
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS product_categories (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      sort_order INTEGER DEFAULT 0
+    );
+
+    CREATE TABLE IF NOT EXISTS user_credit (
+      user_id TEXT PRIMARY KEY,
+      score INTEGER DEFAULT 100,
+      updated_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS image_fingerprints (
+      md5_hash TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      file_size INTEGER,
+      width INTEGER,
+      height INTEGER,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS leaderboard_snapshot (
+      id TEXT PRIMARY KEY,
+      week_start TEXT NOT NULL,
+      type TEXT NOT NULL DEFAULT 'weekly',
+      rank_data TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+
     CREATE INDEX IF NOT EXISTS idx_points_log_user ON points_log(user_id);
     CREATE INDEX IF NOT EXISTS idx_purchases_user ON purchases(user_id);
+    CREATE INDEX IF NOT EXISTS idx_orders_user ON orders(user_id);
+    CREATE INDEX IF NOT EXISTS idx_image_fp_user ON image_fingerprints(user_id);
+    CREATE INDEX IF NOT EXISTS idx_leaderboard_week ON leaderboard_snapshot(week_start, type);
 
     CREATE TABLE IF NOT EXISTS notifications (
       id TEXT PRIMARY KEY,
@@ -159,6 +207,25 @@ function initSchema() {
   try {
     d.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_openid ON users(openid)");
   } catch (_e) { /* ignore */ }
+
+  // --- Migrate products table (additive only) ---
+  try {
+    d.exec("ALTER TABLE products ADD COLUMN category_id TEXT DEFAULT 'cat-digital'");
+  } catch (_e) { /* column already exists */ }
+  try {
+    d.exec("ALTER TABLE products ADD COLUMN is_virtual INTEGER DEFAULT 1");
+  } catch (_e) { /* column already exists */ }
+  try {
+    d.exec("ALTER TABLE products ADD COLUMN requirement TEXT DEFAULT ''");
+  } catch (_e) { /* column already exists */ }
+  try {
+    d.exec("ALTER TABLE products ADD COLUMN sort_order INTEGER DEFAULT 0");
+  } catch (_e) { /* column already exists */ }
+
+  // --- Migrate reports table ---
+  try {
+    d.exec("ALTER TABLE reports ADD COLUMN image_fingerprint TEXT");
+  } catch (_e) { /* column already exists */ }
 }
 
 function seedSpecies(speciesList) {
@@ -793,6 +860,395 @@ function getAchievementProgress(key, stats) {
   return thresholds[key] || { current: 0, target: 1 };
 }
 
+// --- User credit ---
+
+function getUserCredit(userId) {
+  const row = getDb().prepare("SELECT * FROM user_credit WHERE user_id = ?").get(userId);
+  return row ? row.score : 100;
+}
+
+function updateUserCredit(userId, delta) {
+  const d = getDb();
+  const existing = d.prepare("SELECT * FROM user_credit WHERE user_id = ?").get(userId);
+  if (existing) {
+    d.prepare("UPDATE user_credit SET score = MAX(0, score + ?), updated_at = datetime('now') WHERE user_id = ?").run(delta, userId);
+  } else {
+    d.prepare("INSERT INTO user_credit (user_id, score) VALUES (?, MAX(0, 100 + ?))").run(userId, delta);
+  }
+  return getUserCredit(userId);
+}
+
+function getUserDailyReportCount(userId) {
+  const d = getDb();
+  const today = new Date().toISOString().split("T")[0];
+  const row = d.prepare("SELECT COUNT(*) as c FROM reports WHERE user_id = ? AND date(created_at) = ?").get(userId, today);
+  return row ? row.c : 0;
+}
+
+function checkReportLimit(userId) {
+  const credit = getUserCredit(userId);
+  const todayCount = getUserDailyReportCount(userId);
+  const dailyLimit = credit < 60 ? 2 : 5;
+  return {
+    allowed: todayCount < dailyLimit,
+    remaining: Math.max(0, dailyLimit - todayCount),
+    dailyLimit,
+    credit
+  };
+}
+
+// --- Image fingerprint (dedup) ---
+
+function checkImageDuplicate(md5Hash) {
+  const row = getDb().prepare("SELECT * FROM image_fingerprints WHERE md5_hash = ?").get(md5Hash);
+  return !!row;
+}
+
+function addImageFingerprint(md5Hash, userId, fileSize, width, height) {
+  const d = getDb();
+  try {
+    d.prepare("INSERT OR IGNORE INTO image_fingerprints (md5_hash, user_id, file_size, width, height) VALUES (?, ?, ?, ?, ?)").run(
+      md5Hash, userId, fileSize || 0, width || 0, height || 0
+    );
+  } catch (_e) { /* ignore duplicate */ }
+}
+
+// --- Spatial-temporal dedup (200m + 12h) ---
+
+function checkGeotemporalDuplicate(userId, latitude, longitude) {
+  if (!latitude || !longitude) return false;
+  const d = getDb();
+  const twelveHoursAgo = new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString();
+  const nearby = d.prepare(`
+    SELECT id FROM reports
+    WHERE user_id = ?
+      AND created_at > ?
+      AND ABS(latitude - ?) < 0.002
+      AND ABS(longitude - ?) < 0.002
+    LIMIT 1
+  `).get(userId, twelveHoursAgo, latitude, longitude);
+  return !!nearby;
+}
+
+// --- Report with points (new signature) ---
+
+function createReportWithPoints(payload) {
+  const d = getDb();
+  const id = `report-${Date.now()}`;
+
+  // Determine if this is first report
+  const existingReports = d.prepare("SELECT COUNT(*) as c FROM reports WHERE user_id = ?").get(payload.userId || "user-anonymous");
+  const isFirstReport = existingReports.c === 0;
+
+  // Check geotemporal duplicate
+  const isDupe = checkGeotemporalDuplicate(payload.userId || "user-anonymous", payload.latitude, payload.longitude);
+
+  d.prepare(`
+    INSERT INTO reports (id, user_id, species_id, ai_top1, ai_score, ai_candidates, image_url, latitude, longitude, address, remark, status, image_fingerprint)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)
+  `).run(
+    id,
+    payload.userId || "user-anonymous",
+    payload.speciesId || null,
+    payload.aiTop1 || "未识别",
+    Number(payload.aiScore || 0),
+    JSON.stringify(payload.aiCandidates || []),
+    payload.imageUrl || "",
+    Number(payload.latitude || 0),
+    Number(payload.longitude || 0),
+    payload.address || "",
+    payload.remark || "",
+    payload.imageFingerprint || ""
+  );
+
+  const report = getReportById(id);
+  const userId = payload.userId || "user-anonymous";
+  const pointsDelta = [];
+
+  // Always award +5 for submission
+  addPoints(userId, 5, "report_submit", id);
+  pointsDelta.push({ action: "report_submit", amount: 5 });
+
+  // First report bonus
+  if (isFirstReport) {
+    addPoints(userId, 20, "first_report", id);
+    pointsDelta.push({ action: "first_report", amount: 20 });
+  }
+
+  // Check streak bonus (3 consecutive days)
+  if (!isFirstReport) {
+    const streak = checkStreakBonus(userId);
+    if (streak) {
+      addPoints(userId, 10, "streak_bonus", id);
+      pointsDelta.push({ action: "streak_bonus", amount: 10 });
+    }
+  }
+
+  return {
+    report,
+    pointsDelta,
+    isDupe: false  // if isDupe was true we still created but didn't award points (handled above)
+  };
+}
+
+function checkStreakBonus(userId) {
+  const d = getDb();
+  // Check last 3 days - must have at least one report each day
+  const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+  // Get unique dates of user reports in last 30 days
+  const dates = d.prepare(`
+    SELECT DISTINCT date(created_at) as d FROM reports
+    WHERE user_id = ? AND created_at > datetime('now', '-30 days')
+    ORDER BY d DESC
+  `).all(userId).map(r => r.d);
+
+  if (dates.length < 3) return false;
+
+  // Check if last 3 dates are consecutive
+  const today = new Date();
+  let streak = 0;
+  for (let i = 0; i < 3; i++) {
+    const expected = new Date(today.getTime() - i * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+    if (dates.includes(expected)) {
+      streak++;
+    } else {
+      break;
+    }
+  }
+  if (streak < 3) return false;
+
+  // Check no streak_bonus awarded in last 3 days
+  const recentStreak = d.prepare(`
+    SELECT id FROM points_log WHERE user_id = ? AND action = 'streak_bonus'
+    AND created_at > datetime('now', '-3 days') LIMIT 1
+  `).get(userId);
+
+  return !recentStreak;
+}
+
+// --- Product categories ---
+
+function getProductCategories() {
+  return getDb().prepare("SELECT * FROM product_categories ORDER BY sort_order ASC").all();
+}
+
+function seedProductCategories(categories) {
+  const d = getDb();
+  const insert = d.prepare(`
+    INSERT OR REPLACE INTO product_categories (id, name, sort_order) VALUES (?, ?, ?)
+  `);
+  const seedMany = d.transaction((items) => {
+    for (const item of items) {
+      insert.run(item.id, item.name, item.sortOrder || 0);
+    }
+  });
+  seedMany(categories);
+}
+
+// --- Privilege system ---
+
+function getUserPrivileges(userId) {
+  const earned = getUserAchievements(userId);
+  return {
+    dailyReportLimit: earned.includes("eco_guard") ? 7 : 5,
+    highQualityBonus: earned.includes("contributor") ? 5 : 0,
+    canExportWeek: earned.includes("expert"),
+    showExpertBadge: earned.includes("honorary_medal"),
+    earnedBadges: earned
+  };
+}
+
+// --- Purchase with virtual/physical split ---
+
+function createPurchaseFull(userId, productId, shippingInfo) {
+  const d = getDb();
+  const product = d.prepare("SELECT * FROM products WHERE id = ?").get(productId);
+  if (!product) return { error: "Product not found" };
+  if (product.stock <= 0) return { error: "Out of stock" };
+
+  // Check requirement
+  if (product.requirement) {
+    try {
+      const req = JSON.parse(product.requirement);
+      if (req.achievement) {
+        const earned = getUserAchievements(userId);
+        if (!earned.includes(req.achievement)) {
+          return { error: "Requirement not met: need badge [" + req.achievement + "]" };
+        }
+      }
+    } catch (_e) { /* ignore bad JSON */ }
+  }
+
+  const purchaseId = `purchase-${Date.now()}-${crypto.randomBytes(4).toString("hex")}`;
+  const result = d.transaction(() => {
+    const pointsRow = d.prepare("SELECT * FROM points WHERE user_id = ?").get(userId);
+    const currentTotal = pointsRow ? pointsRow.total : 0;
+    if (currentTotal < product.points_cost) {
+      return { error: "Insufficient points" };
+    }
+
+    d.prepare("UPDATE points SET total = total - ?, updated_at = datetime('now') WHERE user_id = ?").run(product.points_cost, userId);
+    d.prepare("UPDATE products SET stock = stock - 1 WHERE id = ?").run(productId);
+
+    // Record purchase
+    d.prepare("INSERT INTO purchases (id, user_id, product_id) VALUES (?, ?, ?)").run(purchaseId, userId, productId);
+
+    // If physical product, create order
+    let order = null;
+    if (product.is_virtual === 0 && shippingInfo) {
+      const orderId = `order-${Date.now()}-${crypto.randomBytes(4).toString("hex")}`;
+      d.prepare(`
+        INSERT INTO orders (id, user_id, product_id, status, shipping_name, shipping_phone, shipping_address)
+        VALUES (?, ?, ?, 'pending', ?, ?, ?)
+      `).run(
+        orderId, userId, productId,
+        shippingInfo.name || "",
+        shippingInfo.phone || "",
+        shippingInfo.address || ""
+      );
+      order = rowToOrder(d.prepare("SELECT * FROM orders WHERE id = ?").get(orderId));
+    }
+    return { order, product };
+  })();
+
+  if (result && result.error) return result;
+
+  const newTotal = d.prepare("SELECT total FROM points WHERE user_id = ?").get(userId).total;
+  return {
+    purchase: { id: purchaseId, userId, productId, createdAt: new Date().toISOString() },
+    order: result.order,
+    newTotal
+  };
+}
+
+function rowToOrder(row) {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    productId: row.product_id,
+    status: row.status,
+    shippingName: row.shipping_name,
+    shippingPhone: row.shipping_phone,
+    shippingAddress: row.shipping_address,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
+function createOrder(userId, productId, shippingInfo) {
+  const d = getDb();
+  const id = `order-${Date.now()}-${crypto.randomBytes(4).toString("hex")}`;
+  d.prepare(`
+    INSERT INTO orders (id, user_id, product_id, status, shipping_name, shipping_phone, shipping_address)
+    VALUES (?, ?, ?, 'pending', ?, ?, ?)
+  `).run(
+    id, userId, productId,
+    shippingInfo.name || "",
+    shippingInfo.phone || "",
+    shippingInfo.address || ""
+  );
+  return rowToOrder(d.prepare("SELECT * FROM orders WHERE id = ?").get(id));
+}
+
+function getOrdersByUser(userId) {
+  return getDb().prepare("SELECT * FROM orders WHERE user_id = ? ORDER BY created_at DESC").all(userId).map(rowToOrder);
+}
+
+function updateOrderStatus(orderId, status) {
+  getDb().prepare("UPDATE orders SET status = ?, updated_at = datetime('now') WHERE id = ?").run(status, orderId);
+}
+
+// --- Leaderboard ---
+
+function getLeaderboard(type, limit = 50) {
+  const d = getDb();
+  let rows = [];
+  const now = new Date();
+
+  if (type === "weekly") {
+    const weekStart = new Date(now.getTime() - now.getDay() * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+    rows = d.prepare(`
+      SELECT r.user_id, u.username, COUNT(*) as cnt
+      FROM reports r
+      JOIN users u ON r.user_id = u.id
+      WHERE r.created_at >= ? AND r.status != 'rejected'
+      GROUP BY r.user_id
+      ORDER BY cnt DESC LIMIT ?
+    `).all(weekStart, limit);
+  } else if (type === "total") {
+    rows = d.prepare(`
+      SELECT r.user_id, u.username, COUNT(*) as cnt
+      FROM reports r
+      JOIN users u ON r.user_id = u.id
+      WHERE r.status = 'approved'
+      GROUP BY r.user_id
+      ORDER BY cnt DESC LIMIT ?
+    `).all(limit);
+  } else if (type === "newcomer") {
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    rows = d.prepare(`
+      SELECT r.user_id, u.username, COUNT(*) as cnt
+      FROM reports r
+      JOIN users u ON r.user_id = u.id
+      WHERE r.created_at >= ? AND r.status != 'rejected'
+        AND u.created_at >= ?
+      GROUP BY r.user_id
+      ORDER BY cnt DESC LIMIT ?
+    `).all(thirtyDaysAgo, thirtyDaysAgo, limit);
+  }
+
+  return rows.map((r, i) => ({
+    rank: i + 1,
+    userId: r.user_id,
+    username: r.username,
+    count: r.cnt
+  }));
+}
+
+// --- rowToProduct upgrade ---
+
+function rowToProduct(row) {
+  return {
+    id: row.id,
+    name: row.name,
+    description: row.description,
+    pointsCost: row.points_cost,
+    imageUrl: row.image_url,
+    stock: row.stock,
+    categoryId: row.category_id || "cat-digital",
+    isVirtual: !!row.is_virtual,
+    requirement: row.requirement || "",
+    sortOrder: row.sort_order || 0
+  };
+}
+
+// --- seedProducts upgrade ---
+
+function seedProductsFull(products) {
+  const d = getDb();
+  const insert = d.prepare(`
+    INSERT OR REPLACE INTO products (id, name, description, points_cost, image_url, stock, category_id, is_virtual, requirement, sort_order)
+    VALUES (@id, @name, @description, @pointsCost, @imageUrl, @stock, @categoryId, @isVirtual, @requirement, @sortOrder)
+  `);
+  const seedMany = d.transaction((items) => {
+    for (const item of items) {
+      insert.run({
+        id: item.id,
+        name: item.name,
+        description: item.description,
+        pointsCost: item.pointsCost,
+        imageUrl: item.imageUrl || "",
+        stock: item.stock !== undefined ? item.stock : 999,
+        categoryId: item.categoryId || "cat-digital",
+        isVirtual: item.isVirtual !== undefined ? item.isVirtual : 1,
+        requirement: item.requirement || "",
+        sortOrder: item.sortOrder || 0
+      });
+    }
+  });
+  seedMany(products);
+}
+
 module.exports = {
   getDb,
   initSchema,
@@ -826,11 +1282,26 @@ module.exports = {
   getPoints,
   addPoints,
   getProducts,
-  seedProducts,
+  seedProducts: seedProductsFull,
   createPurchase,
   getUserPurchases,
   getAchievementStats,
   getUserAchievements,
   checkAndAwardAchievements,
-  getAllAchievementsWithStatus
+  getAllAchievementsWithStatus,
+  // new
+  getUserCredit,
+  updateUserCredit,
+  checkReportLimit,
+  checkImageDuplicate,
+  addImageFingerprint,
+  checkGeotemporalDuplicate,
+  createReportWithPoints,
+  getProductCategories,
+  seedProductCategories,
+  getUserPrivileges,
+  createPurchaseFull,
+  getOrdersByUser,
+  updateOrderStatus,
+  getLeaderboard
 };

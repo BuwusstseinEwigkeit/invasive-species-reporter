@@ -24,31 +24,68 @@
     <text class="muted">暂无商品</text>
   </view>
 
-  <!-- Product grid -->
-  <view class="product-grid" wx:else>
-    <view class="product-card" wx:for="{{products}}" wx:key="id">
-      <view class="product-image">
-        <image wx:if="{{productLocalImages[item.id]}}" class="product-img" src="{{productLocalImages[item.id]}}" mode="aspectFill" />
-        <text wx:else class="product-img-placeholder">{{item.name.slice(0, 1)}}</text>
+  <!-- Product list by category -->
+  <view class="category-section" wx:elif="{{!loading && products.length}}">
+    <view wx:for="{{categories}}" wx:key="id">
+      <view class="category-header">
+        <text class="category-title">{{item.name}}</text>
       </view>
-      <view class="product-body">
-        <text class="product-name">{{item.name}}</text>
-        <text class="muted product-desc">{{item.description}}</text>
-        <view class="product-footer">
-          <text class="product-price">{{item.pointsCost}} 积分</text>
-          <button
-            class="primary-button buy-btn"
-            hover-class="hover-scale"
-            data-id="{{item.id}}"
-            bindtap="buyProduct"
-            wx:if="{{points >= item.pointsCost || !loggedIn}}"
-          >兑换</button>
-          <button
-            class="ghost-button buy-btn disabled-btn"
-            wx:else
-          >积分不足</button>
+      <view class="product-list">
+        <view wx:for="{{products}}" wx:for-item="product" wx:key="id">
+          <view class="product-card" wx:if="{{product.categoryId === item.id}}">
+            <view class="product-image">
+              <image wx:if="{{productLocalImages[product.id]}}" class="product-img" src="{{productLocalImages[product.id]}}" mode="aspectFill" />
+              <text wx:else class="product-img-placeholder">{{product.name.slice(0, 1)}}</text>
+              <view class="product-tag {{product.isVirtual ? 'tag-digital' : 'tag-physical'}}">
+                {{product.isVirtual ? '数字' : '实物'}}
+              </view>
+            </view>
+            <view class="product-body">
+              <text class="product-name">{{product.name}}</text>
+              <text class="muted product-desc">{{product.description}}</text>
+              <view class="product-footer">
+                <text class="product-price">{{product.pointsCost}} 积分</text>
+                <button
+                  class="primary-button buy-btn"
+                  hover-class="hover-scale"
+                  data-id="{{product.id}}"
+                  bindtap="buyProduct"
+                  wx:if="{{points >= product.pointsCost || !loggedIn}}"
+                >兑换</button>
+                <button class="ghost-button buy-btn disabled-btn" wx:else>积分不足</button>
+              </view>
+            </view>
+          </view>
         </view>
       </view>
+    </view>
+  </view>
+
+  <!-- Shipping form modal -->
+  <view class="modal-mask" wx:if="{{shippingModalVisible}}" bindtap="hideShippingForm"></view>
+  <view class="modal-box" wx:if="{{shippingModalVisible}}">
+    <view class="modal-header">
+      <text class="modal-title">填写收货信息</text>
+      <text class="modal-close" bindtap="hideShippingForm">✕</text>
+    </view>
+    <view class="modal-body">
+      <view class="shipping-tip">请确认收货信息，积分兑换后不可撤回。</view>
+      <view class="field">
+        <text class="field-label">收货人</text>
+        <input class="modal-input" placeholder="输入收货人姓名" value="{{shippingForm.name}}" bindinput="onShippingNameInput" />
+      </view>
+      <view class="field">
+        <text class="field-label">联系电话</text>
+        <input class="modal-input" placeholder="输入手机号码" value="{{shippingForm.phone}}" bindinput="onShippingPhoneInput" type="number" />
+      </view>
+      <view class="field">
+        <text class="field-label">收货地址</text>
+        <input class="modal-input" placeholder="输入详细地址" value="{{shippingForm.address}}" bindinput="onShippingAddressInput" />
+      </view>
+    </view>
+    <view class="modal-footer">
+      <button class="ghost-button" bindtap="hideShippingForm">取消</button>
+      <button class="primary-button" bindtap="submitShippingPurchase" disabled="{{buying}}">确认兑换</button>
     </view>
   </view>
 </view>

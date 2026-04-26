@@ -10,7 +10,8 @@
     "pages/login/login",
     "pages/profile/profile",
     "pages/shop/shop",
-    "pages/notifications/notifications"
+    "pages/notifications/notifications",
+    "pages/leaderboard/leaderboard"
   ],
   "window": {
     "navigationBarTitleText": "外来物种哨点",

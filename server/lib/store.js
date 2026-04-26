@@ -7,10 +7,12 @@ function ensureInitialized() {
 
   db.initSchema();
 
-  const { species, reports, reviewLogs } = require("../data/mock-data");
+  const { species, reports, reviewLogs, products, productCategories } = require("../data/mock-data");
   db.seedSpecies(species);
   db.seedReports(reports);
   db.seedReviewLogs(reviewLogs);
+  db.seedProductCategories(productCategories);
+  db.seedProducts(products);
 
   initialized = true;
 }
@@ -126,6 +128,58 @@ function getAllAchievementsWithStatus(userId) {
   return db.getAllAchievementsWithStatus(userId);
 }
 
+function getUserCredit(userId) {
+  return db.getUserCredit(userId);
+}
+
+function updateUserCredit(userId, delta) {
+  return db.updateUserCredit(userId, delta);
+}
+
+function checkReportLimit(userId) {
+  return db.checkReportLimit(userId);
+}
+
+function checkImageDuplicate(md5Hash) {
+  return db.checkImageDuplicate(md5Hash);
+}
+
+function addImageFingerprint(md5Hash, userId, fileSize, width, height) {
+  db.addImageFingerprint(md5Hash, userId, fileSize, width, height);
+}
+
+function checkGeotemporalDuplicate(userId, latitude, longitude) {
+  return db.checkGeotemporalDuplicate(userId, latitude, longitude);
+}
+
+function createReportWithPoints(payload) {
+  return db.createReportWithPoints(payload);
+}
+
+function getProductCategories() {
+  return db.getProductCategories();
+}
+
+function getUserPrivileges(userId) {
+  return db.getUserPrivileges(userId);
+}
+
+function createPurchaseFull(userId, productId, shippingInfo) {
+  return db.createPurchaseFull(userId, productId, shippingInfo);
+}
+
+function getOrdersByUser(userId) {
+  return db.getOrdersByUser(userId);
+}
+
+function updateOrderStatus(orderId, status) {
+  db.updateOrderStatus(orderId, status);
+}
+
+function getLeaderboard(type, limit) {
+  return db.getLeaderboard(type, limit);
+}
+
 module.exports = {
   getSpeciesList,
   getSpeciesById,
@@ -149,5 +203,19 @@ module.exports = {
   getAchievementStats,
   getUserAchievements,
   checkAndAwardAchievements,
-  getAllAchievementsWithStatus
+  getAllAchievementsWithStatus,
+  // new
+  getUserCredit,
+  updateUserCredit,
+  checkReportLimit,
+  checkImageDuplicate,
+  addImageFingerprint,
+  checkGeotemporalDuplicate,
+  createReportWithPoints,
+  getProductCategories,
+  getUserPrivileges,
+  createPurchaseFull,
+  getOrdersByUser,
+  updateOrderStatus,
+  getLeaderboard
 };

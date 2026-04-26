@@ -350,6 +350,25 @@ function checkAchievements() {
   return request("/api/achievements/check", { method: "POST" });
 }
 
+// --- Leaderboard ---
+
+function getLeaderboard(type) {
+  var query = type ? "?type=" + type : "";
+  return request("/api/leaderboard" + query);
+}
+
+// --- User Privileges ---
+
+function getPrivileges() {
+  return request("/api/user/privileges");
+}
+
+// --- Orders ---
+
+function getOrders(userId) {
+  return request("/api/shop/orders/" + userId);
+}
+
 function exportCsv() {
   var baseUrl = app.globalData.apiBaseUrl || "";
   var token = getToken();
@@ -417,5 +436,8 @@ module.exports = {
   downloadImage: downloadImage,
   exportCsv: exportCsv,
   getAchievements: getAchievements,
-  checkAchievements: checkAchievements
+  checkAchievements: checkAchievements,
+  getLeaderboard: getLeaderboard,
+  getPrivileges: getPrivileges,
+  getOrders: getOrders
 };

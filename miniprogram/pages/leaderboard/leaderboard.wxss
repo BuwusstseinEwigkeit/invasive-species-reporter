@@ -1,0 +1,113 @@
+.leaderboard-header {
+  margin-bottom: 0;
+  border-radius: 24rpx 24rpx 0 0;
+}
+
+/* --- Tab bar --- */
+
+.tab-bar {
+  display: flex;
+  background: #fffdf7;
+  border-bottom: 2rpx solid #eef4eb;
+  margin-bottom: 24rpx;
+}
+
+.tab-item {
+  flex: 1;
+  text-align: center;
+  padding: 24rpx 0;
+  font-size: 30rpx;
+  color: #6b786b;
+  position: relative;
+}
+
+.tab-item.active {
+  color: #305d3c;
+  font-weight: 700;
+}
+
+.tab-item.active::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 80rpx;
+  height: 6rpx;
+  background: #305d3c;
+  border-radius: 3rpx;
+}
+
+/* --- Rank list --- */
+
+.rank-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+}
+
+.rank-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #fffdf7;
+  border-radius: 20rpx;
+  padding: 24rpx;
+  box-shadow: 0 4rpx 16rpx rgba(52, 76, 52, 0.05);
+}
+
+.rank-left {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  flex: 1;
+}
+
+.rank-num {
+  width: 48rpx;
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #999;
+  text-align: center;
+}
+
+.rank-num.rank-top {
+  font-size: 36rpx;
+}
+
+.rank-avatar-wrap {
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #eef4eb;
+}
+
+.rank-avatar {
+  width: 100%;
+  height: 100%;
+}
+
+.rank-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4rpx;
+}
+
+.rank-username {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #284d34;
+}
+
+.rank-count {
+  font-size: 24rpx;
+}
+
+.rank-medal {
+  font-size: 40rpx;
+}
+
+.rank-num.rank-top {
+  color: #f59e0b;
+}
