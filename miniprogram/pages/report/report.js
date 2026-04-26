@@ -355,10 +355,21 @@ Page({
         this.setData({ submitSuccess: true });
       }, 700);
     } catch (error) {
-      wx.showToast({
-        title: "提交失败",
-        icon: "none"
-      });
+      var msg = error.message || "";
+      if (msg.includes("上报已达上限")) {
+        wx.showModal({
+          title: "今日上报已达上限",
+          content: "今日提交次数已用完（每日最多5次）。\n\n提升信用分可增加次数：\n• 审核通过每次 +2 分\n• 保持良好记录\n\n信用分 < 60：每日限2次\n信用分 ≥ 60：每日限5次",
+          showCancel: false,
+          confirmText: "我知道了"
+        });
+      } else {
+        wx.showToast({
+          title: msg || "提交失败",
+          icon: "none",
+          duration: 2500
+        });
+      }
     }
   },
 
