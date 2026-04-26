@@ -1,5 +1,6 @@
 const Database = require("better-sqlite3");
 const path = require("path");
+const crypto = require("crypto");
 
 let db = null;
 
@@ -123,9 +124,22 @@ function initSchema() {
     );
 
     CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);
+
+    CREATE TABLE IF NOT EXISTS achievements (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      achievement_key TEXT NOT NULL,
+      earned_at TEXT DEFAULT (datetime('now')),
+      UNIQUE(user_id, achievement_key)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_achievements_user ON achievements(user_id);
   `);
 
-  // Schema upgrades for existing databases
+  // Schema upgrades for existing databases (additive migrations only)
+  // Each block checks if column/index already exists via try/catch
+  // NOTE: This only supports ADDITIVE changes. Column modifications or data migrations
+  // would need a proper migration runner. For MVP this approach is acceptable.
   try {
     d.exec("ALTER TABLE users ADD COLUMN openid TEXT");
   } catch (_e) { /* column already exists */ }
@@ -447,8 +461,6 @@ function getStats() {
 
 // --- User queries ---
 
-const crypto = require("crypto");
-
 function hashPassword(password) {
   const salt = crypto.randomBytes(16).toString("hex");
   const hash = crypto.pbkdf2Sync(password, salt, 100000, 64, "sha512").toString("hex");
@@ -495,8 +507,8 @@ function getUserByOpenId(openid) {
 function createUserFromOpenId(openid, username) {
   const d = getDb();
   const id = `user-${Date.now()}`;
-  // Generate a random password hash (not used for WeChat login)
-  const randomHash = hashPassword(Math.random().toString(36));
+  // Generate a random password hash using cryptographically secure random (not used for WeChat login)
+  const randomHash = hashPassword(crypto.randomBytes(16).toString("hex"));
   const displayName = username || `wx_${openid.slice(-8)}`;
   d.prepare("INSERT INTO users (id, username, password_hash, role, openid) VALUES (?, ?, ?, 'user', ?)").run(
     id, displayName, randomHash, openid
@@ -542,7 +554,7 @@ function addPoints(userId, amount, action, referenceId) {
   } else {
     d.prepare("INSERT INTO points (user_id, total) VALUES (?, ?)").run(userId, Math.max(0, amount));
   }
-  const id = `points-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+  const id = `points-${Date.now()}-${crypto.randomBytes(4).toString("hex")}`;
   d.prepare("INSERT INTO points_log (id, user_id, amount, action, reference_id) VALUES (?, ?, ?, ?, ?)").run(
     id, userId, amount, action, referenceId || null
   );
@@ -592,19 +604,25 @@ function createPurchase(userId, productId) {
   const d = getDb();
   const product = d.prepare("SELECT * FROM products WHERE id = ?").get(productId);
   if (!product) return { error: "Product not found" };
-  const pointsRow = d.prepare("SELECT * FROM points WHERE user_id = ?").get(userId);
-  const currentTotal = pointsRow ? pointsRow.total : 0;
-  if (currentTotal < product.points_cost) {
-    return { error: "Insufficient points" };
-  }
-  if (product.stock <= 0) {
-    return { error: "Out of stock" };
-  }
+  if (product.stock <= 0) return { error: "Out of stock" };
 
-  const purchaseId = `purchase-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
-  d.prepare("UPDATE points SET total = total - ?, updated_at = datetime('now') WHERE user_id = ?").run(product.points_cost, userId);
-  d.prepare("INSERT INTO purchases (id, user_id, product_id) VALUES (?, ?, ?)").run(purchaseId, userId, productId);
-  d.prepare("UPDATE products SET stock = stock - 1 WHERE id = ?").run(productId);
+  const purchaseId = `purchase-${Date.now()}-${crypto.randomBytes(4).toString("hex")}`;
+
+  // Use transaction to prevent race conditions on points deduction
+  const result = d.transaction(() => {
+    const pointsRow = d.prepare("SELECT * FROM points WHERE user_id = ?").get(userId);
+    const currentTotal = pointsRow ? pointsRow.total : 0;
+    if (currentTotal < product.points_cost) {
+      return { error: "Insufficient points" };
+    }
+
+    d.prepare("UPDATE points SET total = total - ?, updated_at = datetime('now') WHERE user_id = ?").run(product.points_cost, userId);
+    d.prepare("INSERT INTO purchases (id, user_id, product_id) VALUES (?, ?, ?)").run(purchaseId, userId, productId);
+    d.prepare("UPDATE products SET stock = stock - 1 WHERE id = ?").run(productId);
+    return null;
+  })();
+
+  if (result && result.error) return result;
 
   const newTotal = d.prepare("SELECT total FROM points WHERE user_id = ?").get(userId).total;
   return {
@@ -635,7 +653,7 @@ function rowToPurchase(row) {
 
 function createNotification(userId, title, body, type, referenceId) {
   const d = getDb();
-  const id = `notif-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+  const id = `notif-${Date.now()}-${crypto.randomBytes(4).toString("hex")}`;
   d.prepare(`
     INSERT INTO notifications (id, user_id, title, body, type, reference_id)
     VALUES (?, ?, ?, ?, ?, ?)
@@ -679,6 +697,102 @@ function rowToNotification(row) {
   };
 }
 
+// --- Achievement definitions ---
+const ACHIEVEMENTS = {
+  first_report: {
+    key: "first_report",
+    name: "新手识别员",
+    description: "提交第一份外来物种上报",
+    badge: "/static/images/badge-newbie.png",
+    condition: (stats) => stats.totalReports >= 1
+  },
+  eco_guard: {
+    key: "eco_guard",
+    name: "生态卫士",
+    description: "累计提交5份上报",
+    badge: "/static/images/badge-ecoguard.png",
+    condition: (stats) => stats.totalReports >= 5
+  },
+  contributor: {
+    key: "contributor",
+    name: "社区贡献者",
+    description: "累计10份上报或5份审核通过",
+    badge: "/static/images/badge-contributor.png",
+    condition: (stats) => stats.totalReports >= 10 || stats.approvedReports >= 5
+  },
+  expert: {
+    key: "expert",
+    name: "火眼金睛",
+    description: "累计20份上报或10份审核通过",
+    badge: "/static/images/badge-expert.png",
+    condition: (stats) => stats.totalReports >= 20 || stats.approvedReports >= 10
+  },
+  honorary_medal: {
+    key: "honorary_medal",
+    name: "物种专家",
+    description: "累计50份上报或获得所有其他成就",
+    badge: "/static/images/badge-species.png",
+    condition: (stats) => stats.totalReports >= 50
+  }
+};
+
+function getAchievementStats(userId) {
+  const d = getDb();
+  const totalReports = d.prepare("SELECT COUNT(*) as c FROM reports WHERE user_id = ?").get(userId)?.c || 0;
+  const approvedReports = d.prepare("SELECT COUNT(*) as c FROM reports WHERE user_id = ? AND status = 'approved'").get(userId)?.c || 0;
+  return { totalReports, approvedReports };
+}
+
+function getUserAchievements(userId) {
+  const d = getDb();
+  const earned = d.prepare("SELECT achievement_key, earned_at FROM achievements WHERE user_id = ?").all(userId);
+  return earned.map(r => r.achievement_key);
+}
+
+function checkAndAwardAchievements(userId) {
+  const d = getDb();
+  const stats = getAchievementStats(userId);
+  const earned = getUserAchievements(userId);
+  const newlyEarned = [];
+
+  for (const [key, achievement] of Object.entries(ACHIEVEMENTS)) {
+    if (!earned.includes(key) && achievement.condition(stats)) {
+      const id = `achievement-${Date.now()}-${crypto.randomBytes(4).toString("hex")}`;
+      try {
+        d.prepare("INSERT INTO achievements (id, user_id, achievement_key) VALUES (?, ?, ?)").run(id, userId, key);
+        newlyEarned.push({ key, name: achievement.name, badge: achievement.badge, description: achievement.description });
+      } catch (_e) { /* ignore duplicate */ }
+    }
+  }
+
+  return newlyEarned;
+}
+
+function getAllAchievementsWithStatus(userId) {
+  const stats = getAchievementStats(userId);
+  const earned = getUserAchievements(userId);
+
+  return Object.values(ACHIEVEMENTS).map(a => ({
+    key: a.key,
+    name: a.name,
+    description: a.description,
+    badge: a.badge,
+    earned: earned.includes(a.key),
+    progress: getAchievementProgress(a.key, stats)
+  }));
+}
+
+function getAchievementProgress(key, stats) {
+  const thresholds = {
+    first_report: { current: stats.totalReports, target: 1 },
+    eco_guard: { current: stats.totalReports, target: 5 },
+    contributor: { current: Math.max(stats.totalReports, stats.approvedReports * 2), target: 10 },
+    expert: { current: Math.max(stats.totalReports, stats.approvedReports * 2), target: 20 },
+    honorary_medal: { current: stats.totalReports, target: 50 }
+  };
+  return thresholds[key] || { current: 0, target: 1 };
+}
+
 module.exports = {
   getDb,
   initSchema,
@@ -714,5 +828,9 @@ module.exports = {
   getProducts,
   seedProducts,
   createPurchase,
-  getUserPurchases
+  getUserPurchases,
+  getAchievementStats,
+  getUserAchievements,
+  checkAndAwardAchievements,
+  getAllAchievementsWithStatus
 };

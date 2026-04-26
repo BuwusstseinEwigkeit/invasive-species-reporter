@@ -30,7 +30,8 @@ Page({
       { value: 60, label: "标准 (推荐)" },
       { value: 30, label: "极限 (最小体积)" }
     ],
-    compressLevelIndex: 1
+    compressLevelIndex: 1,
+    stopPolling: false
   },
 
   toggleCandidates() {
@@ -42,6 +43,7 @@ Page({
   },
 
   onUnload() {
+    this.setData({ stopPolling: true });
     if (this.pollTimer) {
       clearTimeout(this.pollTimer);
       this.pollTimer = null;
@@ -162,6 +164,8 @@ Page({
   },
 
   async pollRecognition(jobId, attempt) {
+    if (this.data.stopPolling) return;
+
     if (attempt > 40) {
       this.setData({
         isRecognizing: false,
@@ -176,6 +180,7 @@ Page({
       const job = res.item;
 
       if (job.status === "queued" || job.status === "processing") {
+        if (this.data.stopPolling) return;
         this.pollTimer = setTimeout(() => {
           this.pollRecognition(jobId, attempt + 1);
         }, 2000);

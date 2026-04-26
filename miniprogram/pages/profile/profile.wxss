@@ -134,6 +134,12 @@
   font-weight: 600;
 }
 
+.badge-progress {
+  font-size: 18rpx;
+  color: #888;
+  text-align: center;
+}
+
 .user-edit {
   padding: 12rpx;
   font-size: 36rpx;

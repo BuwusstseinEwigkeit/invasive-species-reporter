@@ -11,7 +11,9 @@ Page({
     pointsLogs: [],
     loading: true,
     logsCollapsed: false,
-    unread: 0
+    unread: 0,
+    achievements: [],
+    achievementStats: { totalReports: 0, approvedReports: 0 }
   },
 
   toggleLogs() {
@@ -46,6 +48,7 @@ Page({
       });
       this.loadPoints();
       this.loadUnreadCount();
+      this.loadAchievements();
     } else {
       this.setData({
         loggedIn: false,
@@ -106,6 +109,51 @@ Page({
       var res = await api.getNotifications(userId);
       this.setData({ unread: res.unread || 0 });
     } catch (_e) { /* ignore */ }
+  },
+
+  async loadAchievements() {
+    try {
+      var res = await api.getAchievements();
+      var achievements = res.items || [];
+      // Transform badge paths to LOCAL images (bundled with miniprogram)
+      achievements.forEach(function(a) {
+        if (a.badge) {
+          // Extract badge filename from server path like "/static/images/badge-newbie.png"
+          var match = a.badge.match(/\/([^/]+\.png)$/);
+          if (match) {
+            a.badge = "/images/" + match[1];
+          }
+        }
+      });
+      // Calculate stats for progress display
+      var totalReports = 0;
+      var approvedReports = 0;
+      achievements.forEach(function(a) {
+        if (a.progress) {
+          totalReports = a.progress.current || 0;
+        }
+      });
+      // Get approved count from the last achievement if available
+      var lastAchievement = achievements[achievements.length - 1];
+      if (lastAchievement && lastAchievement.progress) {
+        approvedReports = Math.floor(lastAchievement.progress.current / 2);
+      }
+      this.setData({
+        achievements: achievements,
+        achievementStats: { totalReports: totalReports, approvedReports: approvedReports }
+      });
+    } catch (_e) {
+      // Use local fallback images if API fails
+      this.setData({
+        achievements: [
+          { key: "first_report", name: "新手识别员", description: "提交第一份外来物种上报", badge: "/images/badge-newbie.png", earned: false, progress: { current: 0, target: 1 } },
+          { key: "eco_guard", name: "生态卫士", description: "累计提交5份上报", badge: "/images/badge-ecoguard.png", earned: false, progress: { current: 0, target: 5 } },
+          { key: "contributor", name: "社区贡献者", description: "累计10份上报或5份审核通过", badge: "/images/badge-contributor.png", earned: false, progress: { current: 0, target: 10 } },
+          { key: "expert", name: "火眼金睛", description: "累计20份上报或10份审核通过", badge: "/images/badge-expert.png", earned: false, progress: { current: 0, target: 20 } },
+          { key: "honorary_medal", name: "物种专家", description: "累计50份上报或获得所有其他成就", badge: "/images/badge-species.png", earned: false, progress: { current: 0, target: 50 } }
+        ]
+      });
+    }
   },
 
   goNotifications() {

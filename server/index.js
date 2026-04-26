@@ -4,6 +4,7 @@ const express = require("express");
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
+const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
 const {
   getSpeciesList,
@@ -24,15 +25,29 @@ const {
   addPoints,
   getProducts,
   createPurchase,
-  getUserPurchases
+  getUserPurchases,
+  checkAndAwardAchievements,
+  getAllAchievementsWithStatus
 } = require("./lib/store");
-const { registerUpload, getUpload } = require("./lib/upload-store");
+const { registerUpload, getUpload, removeUpload } = require("./lib/upload-store");
 const { createRecognitionJob, getRecognitionJob } = require("./lib/recognition-jobs");
 const db = require("./lib/database");
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
-const JWT_SECRET = process.env.JWT_SECRET || "invasive-species-reporter-dev-secret";
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  console.error("[FATAL] JWT_SECRET environment variable is required. Exit.");
+  process.exit(1);
+}
+if (JWT_SECRET.length < 32) {
+  console.error("[FATAL] JWT_SECRET must be at least 32 characters for security. Exit.");
+  process.exit(1);
+}
+if (JWT_SECRET === "change-me-in-production" || JWT_SECRET === "invasive-species-reporter-dev-secret") {
+  console.error("[FATAL] JWT_SECRET is using an insecure default value. Set a strong random string in .env. Exit.");
+  process.exit(1);
+}
 const uploadsDir = path.join(__dirname, "uploads");
 
 if (!fs.existsSync(uploadsDir)) {
@@ -71,7 +86,7 @@ const storage = multer.diskStorage({
   },
   filename: (_req, file, cb) => {
     const ext = path.extname(file.originalname) || ".jpg";
-    cb(null, `${Date.now()}-${Math.random().toString(16).slice(2)}${ext}`);
+    cb(null, `${Date.now()}-${crypto.randomBytes(8).toString("hex")}${ext}`);
   }
 });
 
@@ -81,23 +96,111 @@ const upload = multer({
     fileSize: 10 * 1024 * 1024
   },
   fileFilter: (_req, file, cb) => {
-    if (file.mimetype.startsWith("image/")) {
-      cb(null, true);
+    if (!file.mimetype.startsWith("image/")) {
+      cb(new Error("Only image uploads are allowed."));
       return;
     }
-    cb(new Error("Only image uploads are allowed."));
+    // Content validation deferred to sharp in upload handler
+    cb(null, true);
   }
 });
 
 // --- CORS ---
+const isProduction = process.env.NODE_ENV === "production";
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || "").split(",").map((s) => s.trim()).filter(Boolean);
+
+if (isProduction && allowedOrigins.length === 0) {
+  console.warn("[CORS] WARNING: Running in production without specific ALLOWED_ORIGINS. CORS is fully restrictive.");
+}
+
 app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", "*");
+  // In production, reject if no valid origin is configured
+  if (isProduction && allowedOrigins.length > 0 && !allowedOrigins.includes("*")) {
+    const origin = req.headers.origin;
+    if (!allowedOrigins.includes(origin)) {
+      res.header("Access-Control-Allow-Origin", "null");
+      res.status(403).json({ success: false, error: "CORS not allowed.", code: 403 });
+      return;
+    }
+    res.header("Access-Control-Allow-Origin", origin);
+  } else if (allowedOrigins.includes("*")) {
+    // Only allow wildcard in non-production
+    res.header("Access-Control-Allow-Origin", req.headers.origin || "*");
+  } else {
+    // No allowed origins configured - restrict all
+    res.header("Access-Control-Allow-Origin", "null");
+  }
+
   res.header("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
   res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
   if (req.method === "OPTIONS") {
     res.status(204).end();
     return;
   }
+  next();
+});
+
+// --- Rate Limiting ---
+const rateLimitWindowMs = Number(process.env.RATE_LIMIT_WINDOW_MS) || 60000; // 1 minute default
+const rateLimitMaxRequests = Number(process.env.RATE_LIMIT_MAX_REQUESTS) || 100; // 100 per window default
+const rateLimitStore = new Map();
+
+function rateLimiter(req, res, next) {
+  // Skip rate limiting for health check
+  if (req.path === "/health") {
+    next();
+    return;
+  }
+
+  const clientIp = (req.headers["x-forwarded-for"] || req.socket.remoteAddress || "unknown").split(",")[0].trim();
+  const key = `rate:${clientIp}`;
+  const now = Date.now();
+
+  let record = rateLimitStore.get(key);
+  if (!record || now - record.windowStart > rateLimitWindowMs) {
+    // Start new window
+    record = { windowStart: now, count: 0 };
+  }
+
+  record.count += 1;
+  rateLimitStore.set(key, record);
+
+  // Set rate limit headers
+  res.setHeader("X-RateLimit-Limit", rateLimitMaxRequests);
+  res.setHeader("X-RateLimit-Remaining", Math.max(0, rateLimitMaxRequests - record.count));
+  res.setHeader("X-RateLimit-Reset", Math.ceil((record.windowStart + rateLimitWindowMs) / 1000));
+
+  if (record.count > rateLimitMaxRequests) {
+    res.status(429).json({
+      success: false,
+      error: "Too many requests. Please try again later.",
+      code: 429,
+      retryAfter: Math.ceil((record.windowStart + rateLimitWindowMs - now) / 1000)
+    });
+    return;
+  }
+
+  next();
+}
+
+// Clean up expired entries periodically
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, record] of rateLimitStore.entries()) {
+    if (now - record.windowStart > rateLimitWindowMs * 2) {
+      rateLimitStore.delete(key);
+    }
+  }
+}, rateLimitWindowMs);
+
+app.use(rateLimiter);
+
+// --- Security Headers ---
+app.use((_req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("X-XSS-Protection", "1; mode=block");
+  res.removeHeader("X-Powered-By");
   next();
 });
 
@@ -130,6 +233,7 @@ function reviewerRequired(req, res, next) {
     return;
   }
 
+  // Always fetch fresh user from DB to get current role
   const user = db.getUserById(req.user.userId);
   if (!user) {
     sendError(res, "User not found.", 401);
@@ -180,8 +284,8 @@ app.post("/api/auth/register", (req, res) => {
     return;
   }
 
-  if (username.length < 3 || password.length < 4) {
-    sendError(res, "Username must be at least 3 chars, password at least 4 chars.", 400);
+  if (username.length < 3 || password.length < 8) {
+    sendError(res, "Username must be at least 3 chars, password at least 8 chars.", 400);
     return;
   }
 
@@ -345,7 +449,7 @@ app.get("/api/reports/my", authRequired, (req, res) => {
   });
 });
 
-app.get("/api/reports/export/csv", (_req, res) => {
+app.get("/api/reports/export/csv", authRequired, (_req, res) => {
   const rows = getApprovedReportsForExport();
 
   // CSV headers (BOM for Excel compatibility with Chinese characters)
@@ -381,11 +485,26 @@ app.get("/api/reports/export/csv", (_req, res) => {
   res.send(csv);
 });
 
-// --- Uploads ---
+const sharp = require("sharp");
 
-app.post("/api/uploads", upload.single("image"), (req, res) => {
+// --- Uploads ---
+app.post("/api/uploads", upload.single("image"), async (req, res) => {
   if (!req.file) {
     sendError(res, "No image uploaded.", 400);
+    return;
+  }
+
+  // Validate actual image content with sharp
+  try {
+    const metadata = await sharp(req.file.path, { failOn: "none" }).metadata();
+    if (!metadata || !metadata.format || !["jpeg", "jpg", "png", "webp", "gif", "heic"].includes(metadata.format.toLowerCase())) {
+      fs.unlinkSync(req.file.path);
+      sendError(res, "Invalid image file content.", 400);
+      return;
+    }
+  } catch (err) {
+    if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+    sendError(res, "Could not validate image file.", 400);
     return;
   }
 
@@ -452,12 +571,12 @@ app.get("/api/recognitions/:jobId", (req, res) => {
 
 app.post("/api/reports", (req, res) => {
   try {
-    var reportUserId = req.body.userId || "";
+    let reportUserId = req.body.userId || "";
     // Extract userId from JWT if available
     try {
-      var token = (req.headers.authorization || "").replace("Bearer ", "");
+      const token = (req.headers.authorization || "").replace("Bearer ", "");
       if (token) {
-        var decoded = jwt.verify(token, JWT_SECRET);
+        const decoded = jwt.verify(token, JWT_SECRET);
         if (decoded.userId) reportUserId = decoded.userId;
       }
     } catch (_e) { /* ignore */ }
@@ -467,6 +586,11 @@ app.post("/api/reports", (req, res) => {
     if (reportUserId && reportUserId !== "user-anonymous") {
       try {
         addPoints(reportUserId, 10, "report_submit", report.id);
+        // Check and award achievements
+        const newlyEarned = checkAndAwardAchievements(reportUserId);
+        if (newlyEarned.length > 0) {
+          createNotification(reportUserId, "🏆 获得新成就", `恭喜获得「${newlyEarned[0].name}」成就！`, "achievement", null);
+        }
       } catch (_e) { /* points award is optional */ }
     }
     res.status(201).json({
@@ -501,6 +625,11 @@ app.post("/api/reports/:id/review", authRequired, reviewerRequired, (req, res) =
         try {
           addPoints(report.userId, 50, "report_approved", report.id);
           createNotification(report.userId, "上报已通过审核", `您的上报「${report.aiTop1}」已通过审核，获得 50 积分奖励。`, "approved", report.id);
+          // Check and award achievements
+          const newlyEarned = checkAndAwardAchievements(report.userId);
+          if (newlyEarned.length > 0) {
+            createNotification(report.userId, "🏆 获得新成就", `恭喜获得「${newlyEarned[0].name}」成就！`, "achievement", null);
+          }
         } catch (_e) { /* points award is optional */ }
       }
     } else if (payload.action === "rejected") {
@@ -599,6 +728,18 @@ app.post("/api/notifications/:userId/read-all", authRequired, (req, res) => {
   }
   markAllNotificationsRead(req.params.userId);
   res.json({ success: true });
+});
+
+// --- Achievements ---
+
+app.get("/api/achievements", authRequired, (req, res) => {
+  const achievements = getAllAchievementsWithStatus(req.user.userId);
+  res.json({ items: achievements });
+});
+
+app.post("/api/achievements/check", authRequired, (req, res) => {
+  const newlyEarned = checkAndAwardAchievements(req.user.userId);
+  res.json({ items: newlyEarned });
 });
 
 // --- Error handler ---

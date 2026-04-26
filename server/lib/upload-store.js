@@ -20,7 +20,12 @@ function getUpload(fileId) {
   return uploadIndex.get(fileId) || null;
 }
 
+function removeUpload(fileId) {
+  uploadIndex.delete(fileId);
+}
+
 module.exports = {
   registerUpload,
-  getUpload
+  getUpload,
+  removeUpload
 };

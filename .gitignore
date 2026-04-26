@@ -10,3 +10,8 @@ server/data/runtime-data.json
 server/data/*.db
 server/data/*.db-shm
 server/data/*.db-wal
+
+# Environment variables — NEVER commit real credentials
+.env
+.env.local
+.env.production

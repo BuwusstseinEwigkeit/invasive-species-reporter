@@ -110,6 +110,22 @@ function getUserPurchases(userId) {
   return db.getUserPurchases(userId);
 }
 
+function getAchievementStats(userId) {
+  return db.getAchievementStats(userId);
+}
+
+function getUserAchievements(userId) {
+  return db.getUserAchievements(userId);
+}
+
+function checkAndAwardAchievements(userId) {
+  return db.checkAndAwardAchievements(userId);
+}
+
+function getAllAchievementsWithStatus(userId) {
+  return db.getAllAchievementsWithStatus(userId);
+}
+
 module.exports = {
   getSpeciesList,
   getSpeciesById,
@@ -129,5 +145,9 @@ module.exports = {
   addPoints,
   getProducts,
   createPurchase,
-  getUserPurchases
+  getUserPurchases,
+  getAchievementStats,
+  getUserAchievements,
+  checkAndAwardAchievements,
+  getAllAchievementsWithStatus
 };

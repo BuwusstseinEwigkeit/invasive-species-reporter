@@ -1,5 +1,39 @@
 var app = getApp();
 
+function parseJwtPayload(token) {
+  if (!token) return {};
+  try {
+    var parts = token.split(".");
+    if (parts.length !== 3) return {};
+    // Fix: use proper base64 decode with padding
+    var base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    // Add padding if needed
+    var padding = base64.length % 4;
+    if (padding === 2) base64 += "==";
+    else if (padding === 3) base64 += "=";
+    // Decode base64 manually (avoiding decodeURIComponent bugs with % sequences)
+    var decoded = "";
+    var chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    var buffer = 0;
+    var bits = 0;
+    for (var i = 0; i < base64.length; i++) {
+      var c = base64[i];
+      if (c === "=") break;
+      var idx = chars.indexOf(c);
+      if (idx === -1) continue;
+      buffer = (buffer << 6) | idx;
+      bits += 6;
+      if (bits >= 8) {
+        bits -= 8;
+        decoded += String.fromCharCode((buffer >> bits) & 0xff);
+      }
+    }
+    return JSON.parse(decoded) || {};
+  } catch (_e) {
+    return {};
+  }
+}
+
 function getToken() {
   try {
     var stored = wx.getStorageSync("auth_token");
@@ -138,11 +172,11 @@ function login(username, password) {
   }).then(function (res) {
     if (res.item && res.item.token) {
       setToken(res.item.token);
-      // Also cache role globally for reliable cross-page access
+      var payload = parseJwtPayload(res.item.token);
       try {
         var app = getApp();
         if (app && app.globalData) {
-          app.globalData.role = res.item.role || "";
+          app.globalData.role = payload.role || "";
         }
       } catch (_e) { /* ignore */ }
     }
@@ -220,10 +254,11 @@ function register(username, password) {
   }).then(function (res) {
     if (res.item && res.item.token) {
       setToken(res.item.token);
+      var payload = parseJwtPayload(res.item.token);
       try {
         var app = getApp();
         if (app && app.globalData) {
-          app.globalData.role = res.item.role || "";
+          app.globalData.role = payload.role || "";
         }
       } catch (_e) { /* ignore */ }
     }
@@ -238,10 +273,11 @@ function wxLogin(code) {
   }).then(function (res) {
     if (res.item && res.item.token) {
       setToken(res.item.token);
+      var payload = parseJwtPayload(res.item.token);
       try {
         var app = getApp();
         if (app && app.globalData) {
-          app.globalData.role = res.item.role || "";
+          app.globalData.role = payload.role || "";
         }
       } catch (_e) { /* ignore */ }
     }
@@ -251,41 +287,20 @@ function wxLogin(code) {
 
 function getMyUserId() {
   var token = getToken();
-  if (!token) return "";
-  try {
-    var parts = token.split(".");
-    if (parts.length === 3) {
-      var payload = JSON.parse(decodeURIComponent(parts[1].replace(/-/g, "+").replace(/_/g, "/").split("").map(function (c) { return "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2); }).join("")));
-      return payload.userId || "";
-    }
-  } catch (_e) { /* ignore */ }
-  return "";
+  var payload = parseJwtPayload(token);
+  return payload.userId || "";
 }
 
 function getMyUsername() {
   var token = getToken();
-  if (!token) return "";
-  try {
-    var parts = token.split(".");
-    if (parts.length === 3) {
-      var payload = JSON.parse(decodeURIComponent(parts[1].replace(/-/g, "+").replace(/_/g, "/").split("").map(function (c) { return "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2); }).join("")));
-      return payload.username || "";
-    }
-  } catch (_e) { /* ignore */ }
-  return "";
+  var payload = parseJwtPayload(token);
+  return payload.username || "";
 }
 
 function getMyRole() {
   var token = getToken();
-  if (!token) return "";
-  try {
-    var parts = token.split(".");
-    if (parts.length === 3) {
-      var payload = JSON.parse(decodeURIComponent(parts[1].replace(/-/g, "+").replace(/_/g, "/").split("").map(function (c) { return "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2); }).join("")));
-      return payload.role || "";
-    }
-  } catch (_e) { /* ignore */ }
-  return "";
+  var payload = parseJwtPayload(token);
+  return payload.role || "";
 }
 
 // --- Notifications ---
@@ -325,13 +340,21 @@ function getPurchases(userId) {
   return request("/api/shop/purchases/" + userId);
 }
 
+// --- Achievements ---
+
+function getAchievements() {
+  return request("/api/achievements");
+}
+
+function checkAchievements() {
+  return request("/api/achievements/check", { method: "POST" });
+}
+
 function exportCsv() {
   var baseUrl = app.globalData.apiBaseUrl || "";
   var token = getToken();
   var url = baseUrl + "/api/reports/export/csv";
-  if (token) {
-    url += "?token=" + encodeURIComponent(token);
-  }
+  // Token is sent via Authorization header only (not in URL query to avoid log leakage)
   return new Promise(function (resolve, reject) {
     wx.downloadFile({
       url: url,
@@ -392,5 +415,7 @@ module.exports = {
   getPurchases: getPurchases,
   resolveImageUrl: resolveImageUrl,
   downloadImage: downloadImage,
-  exportCsv: exportCsv
+  exportCsv: exportCsv,
+  getAchievements: getAchievements,
+  checkAchievements: checkAchievements
 };

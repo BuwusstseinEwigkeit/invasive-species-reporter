@@ -32,25 +32,10 @@
     <view class="card badges-card">
       <text class="section-title">我的成就</text>
       <view class="badges-row">
-        <view class="badge-item">
-          <image class="badge-img" src="/images/badge-newbie.png" mode="aspectFit" />
-          <text class="badge-name">新手识别员</text>
-        </view>
-        <view class="badge-item">
-          <image class="badge-img" src="/images/badge-ecoguard.png" mode="aspectFit" />
-          <text class="badge-name">生态卫士</text>
-        </view>
-        <view class="badge-item">
-          <image class="badge-img" src="/images/badge-contributor.png" mode="aspectFit" />
-          <text class="badge-name">社区贡献者</text>
-        </view>
-        <view class="badge-item locked">
-          <image class="badge-img" src="/images/badge-expert.png" mode="aspectFit" style="opacity:0.4" />
-          <text class="badge-name muted">物种专家</text>
-        </view>
-        <view class="badge-item locked">
-          <image class="badge-img" src="/images/badge-medal.png" mode="aspectFit" style="opacity:0.4" />
-          <text class="badge-name muted">勋章</text>
+        <view class="badge-item {{item.earned ? '' : 'locked'}}" wx:for="{{achievements}}" wx:key="key">
+          <image class="badge-img" src="{{item.badge}}" mode="aspectFit" style="{{item.earned ? '' : 'opacity:0.4'}}" />
+          <text class="badge-name {{item.earned ? '' : 'muted'}}">{{item.name}}</text>
+          <text class="badge-progress" wx:if="{{!item.earned}}">{{item.progress.current}}/{{item.progress.target}}</text>
         </view>
       </view>
     </view>

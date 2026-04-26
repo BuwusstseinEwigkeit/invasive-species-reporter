@@ -1,8 +1,20 @@
-const { getUpload } = require("./upload-store");
+const crypto = require("crypto");
+const { getUpload, removeUpload } = require("./upload-store");
 const { recognizeSpeciesFromImage } = require("./recognition");
 
 const recognitionJobs = new Map();
 const MAX_JOB_ATTEMPTS = 2;
+
+// Detect retryable errors by message content OR by error object properties
+function isRetryableError(error) {
+  if (!error) return false;
+  // Check message strings
+  const msg = error.message || "";
+  if (msg.includes("429") || msg.includes("访问量过大") || msg.includes("503")) return true;
+  // Check numeric statusCode set by recognition.js
+  if (error.statusCode === 429 || error.statusCode === 503) return true;
+  return false;
+}
 
 async function runRecognition(job, uploadRecord, speciesList) {
   job.status = "processing";
@@ -18,9 +30,12 @@ async function runRecognition(job, uploadRecord, speciesList) {
     job.status = "completed";
     job.result = result;
     job.error = "";
+
+    // Clean up upload record to free memory
+    removeUpload(job.fileId);
   } catch (error) {
     const message = error.message || "Recognition failed.";
-    const retryable = message.includes("429") || message.includes("访问量过大") || message.includes("503");
+    const retryable = isRetryableError(error);
 
     if (retryable && job.attempts < MAX_JOB_ATTEMPTS) {
       job.status = "queued";
@@ -33,6 +48,9 @@ async function runRecognition(job, uploadRecord, speciesList) {
 
     job.status = "failed";
     job.error = message;
+
+    // Clean up upload record even on failure
+    removeUpload(job.fileId);
   }
 }
 
@@ -43,7 +61,7 @@ function createRecognitionJob({ fileId, speciesList }) {
     return null;
   }
 
-  const jobId = `job-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const jobId = `job-${Date.now()}-${crypto.randomBytes(8).toString("hex")}`;
 
   const job = {
     jobId,

@@ -53,7 +53,7 @@
   },
   "permission": {
     "scope.userLocation": {
-      "desc": "用于在地图上展示您的上报位置和附近的外来物种分布"
+      "desc": "用来标记你在哪里发现的"
     }
   },
   "style": "v2",

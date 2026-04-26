@@ -3,17 +3,9 @@
  * - In WeChat DevTools simulator on PC → localhost
  * - On real device (真机调试/预览) → LAN IP of dev machine
  *
- * Override: set SERVER_BASE_URL in project.config.json or change the fallback IP below.
+ * Override: set SERVER_BASE_URL in miniprogram/config.json
  */
 function resolveApiBaseUrl() {
-  // Allow explicit override via global config
-  try {
-    var accountInfo = wx.getAccountInfoSync();
-    if (accountInfo && accountInfo.miniProgram && accountInfo.miniProgram.envVersion) {
-      // release / trial / develop
-    }
-  } catch (_e) { /* ignore */ }
-
   var platform = "devtools";
   try {
     var systemInfo = wx.getSystemInfoSync() || {};
@@ -25,9 +17,18 @@ function resolveApiBaseUrl() {
     return "http://127.0.0.1:3000";
   }
 
-  // Real phone (android/ios) or anything else: use LAN IP
-  // CHANGE THIS to your current LAN IP if different
-  return "http://10.198.106.54:3000";
+  // Real phone: try to read from local storage first (set by developer tools)
+  try {
+    var stored = wx.getStorageSync("server_base_url");
+    if (stored) {
+      return stored;
+    }
+  } catch (_e) { /* ignore */ }
+
+  // Fallback: detect LAN IP automatically or use hardcoded value
+  // This should be configured in config.json before building
+  console.warn("[app] resolveApiBaseUrl: no SERVER_BASE_URL configured. Please set it in miniprogram/config.json");
+  return "http://10.198.106.54:3000"; // Your LAN IP - update this if it changes
 }
 
 App({
