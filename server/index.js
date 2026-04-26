@@ -155,7 +155,7 @@ app.use((req, res, next) => {
 
 // --- Rate Limiting ---
 const rateLimitWindowMs = Number(process.env.RATE_LIMIT_WINDOW_MS) || 60000; // 1 minute default
-const rateLimitMaxRequests = Number(process.env.RATE_LIMIT_MAX_REQUESTS) || 100; // 100 per window default
+const rateLimitMaxRequests = Number(process.env.RATE_LIMIT_MAX_REQUESTS) || 500; // 500 per window default
 const rateLimitStore = new Map();
 
 function rateLimiter(req, res, next) {

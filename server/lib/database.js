@@ -4,6 +4,13 @@ const crypto = require("crypto");
 
 let db = null;
 
+function _reset() {
+  if (db) {
+    db.close();
+    db = null;
+  }
+}
+
 function getDb() {
   if (db) return db;
 
@@ -918,15 +925,14 @@ function addImageFingerprint(md5Hash, userId, fileSize, width, height) {
 function checkGeotemporalDuplicate(userId, latitude, longitude) {
   if (!latitude || !longitude) return false;
   const d = getDb();
-  const twelveHoursAgo = new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString();
   const nearby = d.prepare(`
     SELECT id FROM reports
     WHERE user_id = ?
-      AND created_at > ?
+      AND created_at > datetime('now', '-12 hours')
       AND ABS(latitude - ?) < 0.002
       AND ABS(longitude - ?) < 0.002
     LIMIT 1
-  `).get(userId, twelveHoursAgo, latitude, longitude);
+  `).get(userId, latitude, longitude);
   return !!nearby;
 }
 
@@ -1251,6 +1257,7 @@ function seedProductsFull(products) {
 
 module.exports = {
   getDb,
+  _reset,
   initSchema,
   seedSpecies,
   seedReports,
