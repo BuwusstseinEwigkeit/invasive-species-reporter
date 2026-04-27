@@ -18,12 +18,12 @@
   <view class="card review-card" wx:for="{{reports}}" wx:key="id">
     <text class="review-title">{{item.address}}</text>
     <text class="muted">上报时间：{{item.createdAt}}</text>
-    <text class="muted">AI 结果：{{item.aiTop1}}</text>
+    <text class="muted">初判结果：{{item.aiTop1}}</text>
     <text class="muted">备注：{{item.remark || "无"}}</text>
 
     <view class="candidate-wrap" wx:if="{{item.aiCandidates && item.aiCandidates.length}}">
       <view class="candidate-header" hover-class="hover-tap" data-index="{{index}}" bindtap="toggleCandidates">
-        <text class="field-label">AI 候选</text>
+        <text class="field-label">候选结果</text>
         <view class="arrow {{collapsedCandidates.indexOf(index) >= 0 ? '' : 'arrow-down'}}"></view>
       </view>
       <view class="collapse-body {{collapsedCandidates.indexOf(index) >= 0 ? 'hidden' : ''}}">

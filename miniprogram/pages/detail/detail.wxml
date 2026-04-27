@@ -23,7 +23,7 @@
       </view>
       <view class="info-cell">
         <text class="info-label">数据来源</text>
-        <text class="info-value">AI+审核</text>
+        <text class="info-value">人工审核</text>
       </view>
     </view>
 

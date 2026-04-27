@@ -14,9 +14,9 @@
           <text class="version-chip">{{version}}</text>
         </view>
       </view>
-      <text class="hero-title">出门看到奇怪的植物或小动物？拍下来识别一下。</text>
+      <text class="hero-title">出门看到奇怪的植物或小动物？拍下来记录，上报给管理员审核。</text>
       <text class="hero-copy">
-        顺手记录，上报给社区管理员核实。AI 识别仅供参考，不准别怪我。
+        顺手记录，上报给社区管理员核实。结果仅供参考，不作为最终判定依据。
       </text>
       <view class="hero-actions">
         <button class="primary-button" hover-class="hover-scale" bindtap="goReport">立即上报</button>

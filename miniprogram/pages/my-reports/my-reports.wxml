@@ -34,7 +34,7 @@
       bindtap="openDetail"
     >
       <view class="report-main">
-        <text class="report-ai">{{item.aiTop1 || "未识别"}}</text>
+        <text class="report-ai">{{item.aiTop1 || "待审核"}}</text>
         <text class="muted">{{item.address || "未知位置"}}</text>
         <text class="muted time">{{item.createdAt}}</text>
       </view>

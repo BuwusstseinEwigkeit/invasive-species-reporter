@@ -23,7 +23,7 @@
           <view class="compress-picker" hover-class="hover-tap">{{compressLevels[compressLevelIndex].label}}</view>
         </picker>
       </view>
-      <text class="muted">上传前自动压缩图片，降低识别超时概率。选择"高清"可获得更好的审核查看效果。</text>
+      <text class="muted">上传前自动压缩图片，降低上传超时概率。选择"高清"可获得更好的审核查看效果。</text>
     </view>
 
     <view class="field">
@@ -34,11 +34,11 @@
 
     <view class="field ai-card">
       <view class="ai-header" hover-class="hover-tap" bindtap="toggleCandidates">
-        <text class="field-label">AI 初筛结果</text>
+        <text class="field-label">参考结果</text>
         <view class="arrow {{candidatesCollapsed ? '' : 'arrow-down'}}"></view>
       </view>
       <text class="ai-name">{{aiTop1}}</text>
-      <text class="muted" wx:if="{{isRecognizing}}">后台识别中，你可以继续填写位置和备注。</text>
+      <text class="muted" wx:if="{{isRecognizing}}">后台处理中，你可以继续填写位置和备注。</text>
       <text class="muted" wx:if="{{aiScore}}">置信度：{{aiScore}}</text>
       <text class="muted" wx:if="{{aiSummary}}">{{aiSummary}}</text>
       <view class="collapse-body {{candidatesCollapsed ? 'hidden' : ''}}">
@@ -55,7 +55,7 @@
         hover-class="hover-scale"
         bindtap="retryRecognition"
       >
-        重新识别
+        重新匹配
       </button>
     </view>
 
@@ -72,7 +72,7 @@
           {{selectedSpeciesIndex > 0 ? speciesNames[selectedSpeciesIndex] : "暂不选择"}}
         </view>
       </picker>
-      <text class="muted">如果 AI 判断不稳，可以在提交前手动修正。</text>
+      <text class="muted">如果参考结果不确定，可在提交前手动修正。</text>
     </view>
 
     <view class="field">
