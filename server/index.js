@@ -36,6 +36,7 @@ const authRoutes = require("./routes/auth");
 const speciesRoutes = require("./routes/species");
 const reportsRoutes = require("./routes/reports");
 const uploadsRoutes = require("./routes/uploads");
+const shopRoutes = require("./routes/shop");
 const { sendError, sendSuccess } = require("./lib/helpers");
 
 const app = express();
@@ -115,6 +116,7 @@ app.use("/api/species", speciesRoutes);
 
 app.use("/api/reports", reportsRoutes);
 app.use("/api", uploadsRoutes);
+app.use("/api/shop", shopRoutes);
 
 // --- Stats ---
 
@@ -139,41 +141,6 @@ app.post("/api/points/:userId", authRequired, (req, res) => {
   }
   const result = addPoints(req.params.userId, amount, action, referenceId);
   res.status(201).json({ item: result });
-});
-
-// --- Shop routes ---
-
-app.get("/api/shop/products", (_req, res) => {
-  const items = getProducts();
-  const categories = getProductCategories();
-  res.json({ items, categories });
-});
-
-app.post("/api/shop/purchase", authRequired, (req, res) => {
-  const { productId, shippingName, shippingPhone, shippingAddress } = req.body || {};
-  if (!productId) {
-    sendError(res, "Product ID is required.", 400);
-    return;
-  }
-  const shippingInfo = { name: shippingName, phone: shippingPhone, address: shippingAddress };
-  const result = createPurchaseFull(req.user.userId, productId, shippingInfo);
-  if (result.error) {
-    sendError(res, result.error, 400);
-    return;
-  }
-  res.status(201).json({ item: result });
-});
-
-app.get("/api/shop/purchases/:userId", (req, res) => {
-  res.json({ items: getUserPurchases(req.params.userId) });
-});
-
-app.get("/api/shop/orders/:userId", authRequired, (req, res) => {
-  if (req.user.userId !== req.params.userId) {
-    sendError(res, "Access denied.", 403);
-    return;
-  }
-  res.json({ items: getOrdersByUser(req.params.userId) });
 });
 
 // --- Notification routes ---
