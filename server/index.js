@@ -45,6 +45,7 @@ const {
 const { registerUpload, getUpload, removeUpload } = require("./lib/upload-store");
 const { createRecognitionJob, getRecognitionJob } = require("./lib/recognition-jobs");
 const db = require("./lib/database");
+const corsMiddleware = require("./middleware/cors");
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
@@ -118,40 +119,7 @@ const upload = multer({
   }
 });
 
-// --- CORS ---
-const isProduction = process.env.NODE_ENV === "production";
-const allowedOrigins = (process.env.ALLOWED_ORIGINS || "").split(",").map((s) => s.trim()).filter(Boolean);
-
-if (isProduction && allowedOrigins.length === 0) {
-  console.warn("[CORS] WARNING: Running in production without specific ALLOWED_ORIGINS. CORS is fully restrictive.");
-}
-
-app.use((req, res, next) => {
-  // In production, reject if no valid origin is configured
-  if (isProduction && allowedOrigins.length > 0 && !allowedOrigins.includes("*")) {
-    const origin = req.headers.origin;
-    if (!allowedOrigins.includes(origin)) {
-      res.header("Access-Control-Allow-Origin", "null");
-      res.status(403).json({ success: false, error: "CORS not allowed.", code: 403 });
-      return;
-    }
-    res.header("Access-Control-Allow-Origin", origin);
-  } else if (allowedOrigins.includes("*")) {
-    // Only allow wildcard in non-production
-    res.header("Access-Control-Allow-Origin", req.headers.origin || "*");
-  } else {
-    // No allowed origins configured - restrict all
-    res.header("Access-Control-Allow-Origin", "null");
-  }
-
-  res.header("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
-  if (req.method === "OPTIONS") {
-    res.status(204).end();
-    return;
-  }
-  next();
-});
+app.use(corsMiddleware);
 
 // --- Rate Limiting ---
 const rateLimitWindowMs = Number(process.env.RATE_LIMIT_WINDOW_MS) || 60000; // 1 minute default
