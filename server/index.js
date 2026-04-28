@@ -47,6 +47,7 @@ const { createRecognitionJob, getRecognitionJob } = require("./lib/recognition-j
 const db = require("./lib/database");
 const corsMiddleware = require("./middleware/cors");
 const { rateLimiter } = require("./middleware/rate-limit");
+const securityHeaders = require("./middleware/security");
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
@@ -123,14 +124,7 @@ const upload = multer({
 app.use(corsMiddleware);
 app.use(rateLimiter);
 
-// --- Security Headers ---
-app.use((_req, res, next) => {
-  res.setHeader("X-Content-Type-Options", "nosniff");
-  res.setHeader("X-Frame-Options", "DENY");
-  res.setHeader("X-XSS-Protection", "1; mode=block");
-  res.removeHeader("X-Powered-By");
-  next();
-});
+app.use(securityHeaders);
 
 app.use(express.json({ limit: "2mb" }));
 app.use("/uploads", express.static(uploadsDir));
