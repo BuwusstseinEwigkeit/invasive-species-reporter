@@ -48,6 +48,8 @@ const db = require("./lib/database");
 const corsMiddleware = require("./middleware/cors");
 const { rateLimiter } = require("./middleware/rate-limit");
 const securityHeaders = require("./middleware/security");
+const { authRequired, reviewerRequired } = require("./middleware/auth");
+const { sendError, sendSuccess, getPublicBaseUrl } = require("./lib/helpers");
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
@@ -130,62 +132,6 @@ app.use(express.json({ limit: "2mb" }));
 app.use("/uploads", express.static(uploadsDir));
 app.use("/static", express.static(path.join(__dirname, "static")));
 
-// --- JWT middleware ---
-
-function authRequired(req, res, next) {
-  const header = req.headers.authorization || "";
-  const token = header.replace("Bearer ", "");
-
-  if (!token) {
-    sendError(res, "Authentication required.", 401);
-    return;
-  }
-
-  try {
-    req.user = jwt.verify(token, JWT_SECRET);
-    next();
-  } catch (_err) {
-    sendError(res, "Invalid or expired token.", 401);
-  }
-}
-
-function reviewerRequired(req, res, next) {
-  if (!req.user) {
-    sendError(res, "Authentication required.", 401);
-    return;
-  }
-
-  // Always fetch fresh user from DB to get current role
-  const user = db.getUserById(req.user.userId);
-  if (!user) {
-    sendError(res, "User not found.", 401);
-    return;
-  }
-
-  if (user.role !== "reviewer" && user.role !== "admin") {
-    sendError(res, "Reviewer role required.", 403);
-    return;
-  }
-
-  req.userRole = user.role;
-  next();
-}
-
-// --- Unified API helpers ---
-
-function sendError(res, error, code = 400) {
-  res.status(code).json({ success: false, error, code });
-}
-
-function sendSuccess(res, data, statusCode = 200) {
-  res.status(statusCode).json(data);
-}
-
-// --- Helper ---
-
-function getPublicBaseUrl(req) {
-  return process.env.SERVER_PUBLIC_BASE_URL || `${req.protocol}://${req.get("host")}`;
-}
 
 // --- Health ---
 
