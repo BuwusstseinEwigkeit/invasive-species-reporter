@@ -649,7 +649,11 @@ function rowToProduct(row) {
     description: row.description,
     pointsCost: row.points_cost,
     imageUrl: row.image_url,
-    stock: row.stock
+    stock: row.stock,
+    categoryId: row.category_id || "cat-digital",
+    isVirtual: !!row.is_virtual,
+    requirement: row.requirement || "",
+    sortOrder: row.sort_order || 0
   };
 }
 
@@ -1209,23 +1213,6 @@ function getLeaderboard(type, limit = 50) {
     username: r.username,
     count: r.cnt
   }));
-}
-
-// --- rowToProduct upgrade ---
-
-function rowToProduct(row) {
-  return {
-    id: row.id,
-    name: row.name,
-    description: row.description,
-    pointsCost: row.points_cost,
-    imageUrl: row.image_url,
-    stock: row.stock,
-    categoryId: row.category_id || "cat-digital",
-    isVirtual: !!row.is_virtual,
-    requirement: row.requirement || "",
-    sortOrder: row.sort_order || 0
-  };
 }
 
 // --- seedProducts upgrade ---
