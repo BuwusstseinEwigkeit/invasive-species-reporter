@@ -4,27 +4,7 @@ const express = require("express");
 const path = require("path");
 const fs = require("fs");
 const {
-  getSpeciesList,
-  getSpeciesById,
-  getSpeciesReports,
-  getNotifications,
-  getUnreadNotificationCount,
-  markNotificationRead,
-  markAllNotificationsRead,
   getStats,
-  getPoints,
-  addPoints,
-  getProducts,
-  createPurchase,
-  getUserPurchases,
-  checkAndAwardAchievements,
-  getAllAchievementsWithStatus,
-  getUserCredit,
-  getProductCategories,
-  getUserPrivileges,
-  createPurchaseFull,
-  getOrdersByUser,
-  updateOrderStatus,
   getLeaderboard
 } = require("./lib/store");
 const db = require("./lib/database");
@@ -37,6 +17,7 @@ const speciesRoutes = require("./routes/species");
 const reportsRoutes = require("./routes/reports");
 const uploadsRoutes = require("./routes/uploads");
 const shopRoutes = require("./routes/shop");
+const userRoutes = require("./routes/user");
 const { sendError, sendSuccess } = require("./lib/helpers");
 
 const app = express();
@@ -117,6 +98,7 @@ app.use("/api/species", speciesRoutes);
 app.use("/api/reports", reportsRoutes);
 app.use("/api", uploadsRoutes);
 app.use("/api/shop", shopRoutes);
+app.use("/api", userRoutes);
 
 // --- Stats ---
 
@@ -124,73 +106,6 @@ app.get("/api/stats", (_req, res) => {
   res.json({
     item: getStats()
   });
-});
-
-// --- Points routes ---
-
-app.get("/api/points/:userId", (req, res) => {
-  const result = getPoints(req.params.userId);
-  res.json({ item: result });
-});
-
-app.post("/api/points/:userId", authRequired, (req, res) => {
-  const { amount, action, referenceId } = req.body || {};
-  if (!amount || !action) {
-    sendError(res, "Amount and action are required.", 400);
-    return;
-  }
-  const result = addPoints(req.params.userId, amount, action, referenceId);
-  res.status(201).json({ item: result });
-});
-
-// --- Notification routes ---
-
-app.get("/api/notifications/:userId", authRequired, (req, res) => {
-  if (req.user.userId !== req.params.userId) {
-    sendError(res, "Access denied.", 403);
-    return;
-  }
-  const items = getNotifications(req.params.userId, Number(req.query.limit) || 50);
-  const unread = getUnreadNotificationCount(req.params.userId);
-  res.json({ items, unread });
-});
-
-app.post("/api/notifications/:id/read", authRequired, (req, res) => {
-  const notif = markNotificationRead(req.params.id);
-  if (!notif) {
-    sendError(res, "Not Found", 404);
-    return;
-  }
-  res.json({ item: notif });
-});
-
-app.post("/api/notifications/:userId/read-all", authRequired, (req, res) => {
-  if (req.user.userId !== req.params.userId) {
-    sendError(res, "Access denied.", 403);
-    return;
-  }
-  markAllNotificationsRead(req.params.userId);
-  res.json({ success: true });
-});
-
-// --- Achievements ---
-
-app.get("/api/achievements", authRequired, (req, res) => {
-  const achievements = getAllAchievementsWithStatus(req.user.userId);
-  res.json({ items: achievements });
-});
-
-app.post("/api/achievements/check", authRequired, (req, res) => {
-  const newlyEarned = checkAndAwardAchievements(req.user.userId);
-  res.json({ items: newlyEarned });
-});
-
-// --- User privileges ---
-
-app.get("/api/user/privileges", authRequired, (req, res) => {
-  const credit = getUserCredit(req.user.userId);
-  const privileges = getUserPrivileges(req.user.userId);
-  res.json({ item: { credit, ...privileges } });
 });
 
 // --- Leaderboard ---
