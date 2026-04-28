@@ -50,6 +50,7 @@ const { rateLimiter } = require("./middleware/rate-limit");
 const securityHeaders = require("./middleware/security");
 const { authRequired, reviewerRequired } = require("./middleware/auth");
 const authRoutes = require("./routes/auth");
+const speciesRoutes = require("./routes/species");
 const { sendError, sendSuccess, getPublicBaseUrl } = require("./lib/helpers");
 
 const app = express();
@@ -147,27 +148,9 @@ app.get("/health", (_req, res) => {
 
 app.use("/api/auth", authRoutes);
 
-// --- Species ---
+// --- Species routes ---
 
-app.get("/api/species", (_req, res) => {
-  res.json({
-    items: getSpeciesList()
-  });
-});
-
-app.get("/api/species/:id", (req, res) => {
-  const species = getSpeciesById(req.params.id);
-
-  if (!species) {
-    sendError(res, "Not Found", 404);
-    return;
-  }
-
-  res.json({
-    item: species,
-    reports: getSpeciesReports(req.params.id)
-  });
-});
+app.use("/api/species", speciesRoutes);
 
 // --- Reports ---
 
