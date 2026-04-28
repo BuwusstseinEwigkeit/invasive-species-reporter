@@ -194,7 +194,7 @@ case "${1:-}" in
     ;;
   --daemon|-d)
     log "启动后台迭代模式..."
-    bash loop.sh --daemon --max-loops="${MAX_LOOPS:-100}"
+    bash tools/loop.sh --daemon --max-loops="${MAX_LOOPS:-100}"
     ;;
   --help|-h)
     echo "外来物种哨兵 — 持续迭代系统"
@@ -232,9 +232,9 @@ case "${1:-}" in
     echo ""
 
     # 保存检查点
-    bash cron-resume.sh --checkpoint 2>/dev/null || true
+    bash tools/cron-resume.sh --checkpoint 2>/dev/null || true
 
     # 启动循环
-    bash loop.sh "$@"
+    bash tools/loop.sh "$@"
     ;;
 esac

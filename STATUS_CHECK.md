@@ -18,7 +18,7 @@ ls node_modules/.package-lock.json > /dev/null 2>&1 && echo "✅ dependencies in
 # 检查后端能否正常启动（启动后按 Ctrl+C 停止）
 cd $PROJECT_ROOT && timeout 5 node server/index.js 2>&1 || true
 ```
-- 期待输出包含 `Server running on port 3001` 或类似启动成功的日志
+- 期待输出包含 `Server running on port 3000` 或类似启动成功的日志
 - 不应有 `Error` / `Cannot` 等未捕获错误
 
 ## 3. API 冒烟测试
@@ -27,19 +27,19 @@ cd $PROJECT_ROOT && timeout 5 node server/index.js 2>&1 || true
 
 ```bash
 # 3a. 健康检查 / 首页
-curl -s -o /dev/null -w "%{http_code}" http://localhost:3001/
+curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/
 
 # 3b. 物种列表
-curl -s http://localhost:3001/api/species | head -c 200
+curl -s http://localhost:3000/api/species | head -c 200
 
 # 3c. 上报记录列表
-curl -s http://localhost:3001/api/reports | head -c 200
+curl -s http://localhost:3000/api/reports | head -c 200
 
 # 3d. 统计信息
-curl -s http://localhost:3001/api/stats | head -c 200
+curl -s http://localhost:3000/api/stats | head -c 200
 
 # 3e. 登录（测试 JWT Auth）
-curl -s -X POST http://localhost:3001/api/auth/login \
+curl -s -X POST http://localhost:3000/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"username":"demo","password":"demo123"}' | head -c 200
 ```
@@ -69,7 +69,7 @@ done
 ### 示例：微信登录验证
 ```
 # 验证登录接口存在
-curl -s -X POST http://localhost:3001/api/auth/wx-login \
+curl -s -X POST http://localhost:3000/api/auth/wx-login \
   -H "Content-Type: application/json" \
   -d '{"code":"test_code"}' | head -c 200
 ```

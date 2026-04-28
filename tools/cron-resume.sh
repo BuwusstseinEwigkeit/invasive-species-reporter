@@ -19,7 +19,7 @@ PROJECT_ROOT="C:/Users/admin/source/repos/invasive-species-reporter"
 RESUME_LOG="$PROJECT_ROOT/.resume.log"
 CHECKPOINT_FILE="$PROJECT_ROOT/.checkpoint.json"
 PID_FILE="/tmp/claude-loop.pid"
-LOOP_SCRIPT="$PROJECT_ROOT/loop.sh"
+LOOP_SCRIPT="$PROJECT_ROOT/tools/loop.sh"
 
 # 确保在正确的目录
 cd "$PROJECT_ROOT" 2>/dev/null || {
@@ -142,7 +142,7 @@ resume() {
 
 schedule_cron() {
   local cron_expr="*/15 * * * *"  # 每15分钟检查一次
-  local resume_script="cd $PROJECT_ROOT && bash cron-resume.sh --quiet"
+  local resume_script="cd $PROJECT_ROOT && bash tools/cron-resume.sh --quiet"
 
   log "Registering cron job: $cron_expr $resume_script"
 
@@ -154,7 +154,7 @@ schedule_cron() {
   fi
 
   # 注册
-  (crontab -l 2>/dev/null; echo "$cron_expr bash $PROJECT_ROOT/cron-resume.sh --quiet") | crontab -
+  (crontab -l 2>/dev/null; echo "$cron_expr bash $PROJECT_ROOT/tools/cron-resume.sh --quiet") | crontab -
 
   log "✅ Cron job registered (every 15 minutes)"
   log "   To remove: crontab -l | grep -v cron-resume | crontab -"

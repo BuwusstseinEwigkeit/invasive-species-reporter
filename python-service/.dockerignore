@@ -1,5 +1,0 @@
-# Python 服务 .dockerignore
-__pycache__
-*.pyc
-.env
-.git

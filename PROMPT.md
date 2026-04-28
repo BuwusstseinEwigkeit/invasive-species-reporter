@@ -14,7 +14,7 @@
 
 **核心功能**:
 - 用户上报外来物种线索（拍照 + 定位 + 备注）
-- AI 自动识别物种（智谱 GLM-4.6v-flash → Ollama 后备 → Mock 兜底）
+- AI 自动识别物种（智谱 GLM-4.6v-flash → Moonshot/Kimi → Ollama → Python → Mock 五级降级链）
 - 人工审核流程（审核员驳回/通过）
 - 地图可视化展示已审核点位
 - 积分/商城/个人中心系统
@@ -51,24 +51,34 @@
 ├── PROMPT.md              ← 本文件（每次循环入口）
 ├── TASK.md                ← 任务清单（追踪进度）
 ├── STATUS_CHECK.md        ← 完成度验证清单
-├── loop.sh                ← 外部循环脚本
-├── cron-resume.sh         ← 自动续命脚本
-├── HANDOFF.md             ← 项目交接文档（含当前状态）
+├── ITERATION.md           ← 调试历史和架构决策记录
 ├── .claude/CLAUDE.md      ← Claude 项目级行为指南
+│
+├── tools/                 ← AI 持续迭代工具链
+│   ├── auto-iterate.sh
+│   ├── cron-resume.sh
+│   └── loop.sh
 │
 ├── miniprogram/           ← 微信小程序前端
 │   ├── app.js / app.json / app.wxss
-│   └── pages/             ← 10 个页面
+│   └── pages/             ← 12 个页面
 │
 ├── server/                ← Node.js 后端
-│   ├── index.js           ← 入口
+│   ├── index.js           ← 入口（89行，只做连线）
+│   ├── middleware/        ← 中间件（CORS, 限流, 安全头, JWT认证）
+│   ├── routes/            ← 路由模块（auth, species, reports, uploads, shop, user, misc）
 │   ├── lib/               ← 核心逻辑
 │   │   ├── database.js    ← DB 层（schema 定义）
 │   │   ├── store.js       ← 数据访问
-│   │   ├── recognition.js ← 识别服务链
+│   │   ├── recognition.js ← 识别服务链（5级降级）
 │   │   ├── recognition-jobs.js ← 异步 Job 管理
-│   │   └── upload-store.js← 文件上传
+│   │   ├── upload-store.js← 文件上传注册表
+│   │   └── helpers.js     ← 响应工具函数
 │   └── data/              ← 数据库 & 种子数据
+│
+├── tests/                 ← 测试
+│   ├── anti-spam.test.js  ← 25个反垃圾机制测试
+│   └── golden-path.test.js← 15个集成测试
 │
 ├── docs/                  ← 设计文档
 │   ├── architecture.md
@@ -87,7 +97,7 @@ cd C:/Users/admin/source/repos/invasive-species-reporter
 npm start
 ```
 
-服务运行在 `http://localhost:3001`（见 `.env` 配置）。
+服务运行在 `http://localhost:3000`（见 `.env` 配置）。
 
 ---
 
