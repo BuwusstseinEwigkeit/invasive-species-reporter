@@ -5,17 +5,10 @@ const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 const crypto = require("crypto");
-const jwt = require("jsonwebtoken");
 const {
   getSpeciesList,
   getSpeciesById,
-  getReports,
-  getReportsByUser,
   getSpeciesReports,
-  createReport,
-  reviewReport,
-  getApprovedReportsForExport,
-  createNotification,
   getNotifications,
   getUnreadNotificationCount,
   markNotificationRead,
@@ -29,12 +22,6 @@ const {
   checkAndAwardAchievements,
   getAllAchievementsWithStatus,
   getUserCredit,
-  updateUserCredit,
-  checkReportLimit,
-  checkImageDuplicate,
-  addImageFingerprint,
-  checkGeotemporalDuplicate,
-  createReportWithPoints,
   getProductCategories,
   getUserPrivileges,
   createPurchaseFull,
@@ -51,6 +38,7 @@ const securityHeaders = require("./middleware/security");
 const { authRequired, reviewerRequired } = require("./middleware/auth");
 const authRoutes = require("./routes/auth");
 const speciesRoutes = require("./routes/species");
+const reportsRoutes = require("./routes/reports");
 const { sendError, sendSuccess, getPublicBaseUrl } = require("./lib/helpers");
 
 const app = express();
@@ -154,67 +142,12 @@ app.use("/api/species", speciesRoutes);
 
 // --- Reports ---
 
-app.get("/api/reports", (req, res) => {
-  const result = getReports(req.query.status, req.query.page, req.query.limit);
-  res.json({
-    items: result.items,
-    page: result.pagination.page,
-    limit: result.pagination.limit,
-    total: result.pagination.total,
-    totalPages: result.pagination.totalPages
-  });
-});
+app.use("/api/reports", reportsRoutes);
 
-app.get("/api/reports/my", authRequired, (req, res) => {
-  const result = getReportsByUser(req.user.userId, req.query.status, req.query.page, req.query.limit);
-  res.json({
-    items: result.items,
-    page: result.pagination.page,
-    limit: result.pagination.limit,
-    total: result.pagination.total,
-    totalPages: result.pagination.totalPages
-  });
-});
-
-app.get("/api/reports/export/csv", authRequired, (_req, res) => {
-  const rows = getApprovedReportsForExport();
-
-  // CSV headers (BOM for Excel compatibility with Chinese characters)
-  const bom = "\uFEFF";
-  const headers = [
-    "ID", "用户ID", "识别物种", "拉丁名", "识别置信度",
-    "入侵等级", "物种类别", "原产地",
-    "经度", "纬度", "地点", "备注", "图片URL",
-    "上报时间"
-  ];
-
-  const csvRows = rows.map(r => [
-    r.id,
-    r.user_id,
-    r.ai_top1,
-    r.species_latin || "",
-    r.ai_score !== null ? Number(r.ai_score).toFixed(2) : "",
-    r.species_risk || "",
-    r.species_category || "",
-    r.species_origin || "",
-    r.longitude,
-    r.latitude,
-    r.address || "",
-    (r.remark || "").replace(/"/g, '""'),
-    r.image_url || "",
-    r.created_at
-  ].map(v => v === null || v === undefined ? "" : `"${String(v).replace(/"/g, '""')}"`).join(","));
-
-  const csv = bom + headers.join(",") + "\n" + csvRows.join("\n");
-
-  res.setHeader("Content-Type", "text/csv; charset=utf-8");
-  res.setHeader("Content-Disposition", `attachment; filename="invasive-species-export-${Date.now()}.csv"`);
-  res.send(csv);
-});
-
-const sharp = require("sharp");
 
 // --- Uploads ---
+const sharp = require("sharp");
+
 app.post("/api/uploads", upload.single("image"), async (req, res) => {
   if (!req.file) {
     sendError(res, "No image uploaded.", 400);
@@ -294,162 +227,7 @@ app.get("/api/recognitions/:jobId", (req, res) => {
   }
 });
 
-// --- Create report ---
 
-app.post("/api/reports", (req, res) => {
-  try {
-    let reportUserId = "";
-    try {
-      const token = (req.headers.authorization || "").replace("Bearer ", "");
-      if (token) {
-        const decoded = jwt.verify(token, JWT_SECRET);
-        if (decoded.userId) reportUserId = decoded.userId;
-      }
-    } catch (_e) { /* ignore */ }
-
-    const userId = reportUserId || "user-anonymous";
-
-    // Check daily limit
-    if (userId !== "user-anonymous") {
-      const limit = checkReportLimit(userId);
-      if (!limit.allowed) {
-        sendError(res, `今日上报已达上限（每日${limit.dailyLimit}次），信用分过低请保持良好记录。`, 429);
-        return;
-      }
-    }
-
-    const { fileId, latitude, longitude } = req.body || {};
-
-    // Image fingerprint dedup
-    if (fileId) {
-      const uploadRecord = getUpload(fileId);
-      if (uploadRecord) {
-        // compute md5 from file path
-        const fs = require("fs");
-        const crypto = require("crypto");
-        let md5Hash = "";
-        try {
-          const fileBuffer = fs.readFileSync(uploadRecord.path);
-          md5Hash = crypto.createHash("md5").update(fileBuffer).digest("hex");
-        } catch (_e) { /* ignore */ }
-
-        if (md5Hash && checkImageDuplicate(md5Hash)) {
-          sendError(res, "图片重复，请勿重复上传相同图片。", 400);
-          return;
-        }
-        if (md5Hash) {
-          addImageFingerprint(md5Hash, userId, uploadRecord.size, 0, 0);
-        }
-      }
-    }
-
-    // Geotemporal dedup (do not award points if dupe, but still create report)
-    let isDupe = false;
-    if (userId !== "user-anonymous" && latitude && longitude) {
-      isDupe = checkGeotemporalDuplicate(userId, latitude, longitude);
-    }
-
-    const reportPayload = {
-      userId,
-      speciesId: req.body.speciesId,
-      aiTop1: req.body.aiTop1,
-      aiScore: req.body.aiScore,
-      aiCandidates: req.body.aiCandidates,
-      imageUrl: req.body.imageUrl,
-      latitude,
-      longitude,
-      address: req.body.address,
-      remark: req.body.remark,
-      imageFingerprint: ""
-    };
-
-    const result = createReportWithPoints(reportPayload);
-
-    if (userId !== "user-anonymous" && !isDupe) {
-      try {
-        const newlyEarned = checkAndAwardAchievements(userId);
-        if (newlyEarned.length > 0) {
-          createNotification(userId, "🏆 获得新成就", `恭喜获得「${newlyEarned[0].name}」成就！`, "achievement", null);
-        }
-      } catch (_e) { /* optional */ }
-    }
-
-    res.status(201).json({
-      item: result.report,
-      message: isDupe ? "Report created (duplicate location, no points awarded)." : "Report created and waiting for review.",
-      pointsDelta: isDupe ? [] : result.pointsDelta
-    });
-  } catch (error) {
-    sendError(res, "Invalid JSON body", 400);
-  }
-});
-
-// --- Review (protected) ---
-
-app.post("/api/reports/:id/review", authRequired, reviewerRequired, (req, res) => {
-  try {
-    const payload = {
-      ...req.body,
-      reviewerId: req.user.userId
-    };
-
-    const result = reviewReport(req.params.id, payload);
-
-    if (!result) {
-      sendError(res, "Not Found", 404);
-      return;
-    }
-
-    // Award points based on action
-    if (payload.action === "approved") {
-      const report = result.report;
-      if (report && report.userId && report.userId !== "user-anonymous") {
-        try {
-          // Base +20 for approval
-          addPoints(report.userId, 20, "report_approved", report.id);
-          // High quality bonus (+10) if AI score > 0.95 or reviewer marked it
-          const isHighQuality = report.aiScore > 0.95 || payload.highQuality;
-          if (isHighQuality) {
-            addPoints(report.userId, 10, "high_quality", report.id);
-          }
-          updateUserCredit(report.userId, 2);
-          createNotification(report.userId, "上报已通过审核",
-            `您的上报「${report.aiTop1}」已通过审核${isHighQuality ? "（高质量+10）" : ""}，获得 ${isHighQuality ? 30 : 20} 积分奖励。`,
-            "approved", report.id);
-          const newlyEarned = checkAndAwardAchievements(report.userId);
-          if (newlyEarned.length > 0) {
-            createNotification(report.userId, "🏆 获得新成就", `恭喜获得「${newlyEarned[0].name}」成就！`, "achievement", null);
-          }
-        } catch (_e) { /* optional */ }
-      }
-    } else if (payload.action === "rejected") {
-      const report = result.report;
-      if (report && report.userId && report.userId !== "user-anonymous") {
-        try {
-          updateUserCredit(report.userId, -3);
-          const reason = payload.comment ? `原因：${payload.comment}` : "请查看审核意见。";
-          createNotification(report.userId, "上报未通过审核", `您的上报「${report.aiTop1}」未通过审核。${reason}`, "rejected", report.id);
-        } catch (_e) { /* optional */ }
-      }
-    } else if (payload.action === "spam") {
-      const report = result.report;
-      if (report && report.userId && report.userId !== "user-anonymous") {
-        try {
-          addPoints(report.userId, -10, "report_spam", report.id);
-          updateUserCredit(report.userId, -10);
-          createNotification(report.userId, "⚠️ 上报被标记为无效", `您的上报「${report.aiTop1}」被判定为垃圾上报，积分-10，信用分-10。`, "rejected", report.id);
-        } catch (_e) { /* optional */ }
-      }
-    }
-
-    res.json({
-      item: result.report,
-      review: result.log
-    });
-  } catch (error) {
-    sendError(res, "Invalid JSON body", 400);
-  }
-});
 
 // --- Stats ---
 
