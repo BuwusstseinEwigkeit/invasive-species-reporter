@@ -7,7 +7,7 @@
 3. **完成一个任务后自动继续下一个** — 不要询问"接下来做什么"，直接做
 4. **使用子 Agent 拆分复杂任务** — 当单个任务需要改动超过 3 个文件或涉及不确定方案时，用 Agent tool 进行调研或规划
 5. **每次修改后验证** — 运行 `STATUS_CHECK.md` 中的验证步骤
-6. **更新 HANDOFF.md** — 每次完成重要进展时追加记录
+6. **更新 docs/archive/HANDOFF.md** — 每次完成重要进展时追加记录
 
 ## 任务执行模式
 
@@ -26,11 +26,28 @@
 - 理解 bug 根因后再动手
 - 改动最小化
 
+## 已知技术债（已核实）
+
+1. ~~🔴 SQL 注入~~ — 已确认无误判，所有查询均用 `?` 参数化
+2. ~~🟢 review_logs 未写入~~ — reviewReport 已写入，无需修复
+3. ~~🟡 isDupe 返回值死代码~~ — index.js 独立计算 isDupe，database.js 返回值不影响实际行为
+4. ~~🟡 created_at 时区混用~~ — 已修复：所有 `datetime('now')` → `strftime('%Y-%m-%dT%H:%M:%SZ', 'now')`，新记录统一 UTC ISO 8601
+5. ~~🟡 CSV 导出无 expert 徽章权限校验~~ — 已修复，index.js 已有权限判断
+6. 🟡 图片去重可绕过：MD5 可通过重命名绕过，pHash 升级方案已设计（blockhash-core + 双key迁移），尚未实现
+7. 🟡 geo dedup timezone mismatch：函数内部 now() 已统一 UTC，但 200m/12h 阈值参数需实测验证
+
 ## 上下文管理
 
 - 当会话上下文接近用完时（token 计数高），用 `TASK.md` 保存进度后重启
-- 重启后读取 `TASK.md` 和 `HANDOFF.md` 恢复上下文
+- 重启后读取 `PROMPT.md` 和 `.claude/CLAUDE.md` 恢复上下文
 - 复杂调研始终走子 Agent，不要把大量搜索结果塞进主上下文
+
+## 服务端结构
+
+- `server/index.js` — 入口（89行，纯连线：初始化 → 中间件 → 路由 → 错误处理）
+- `server/middleware/` — cors, rate-limit, security, auth
+- `server/routes/` — auth, species, reports, uploads, shop, user, misc（按功能拆分）
+- `server/lib/` — database, store, recognition, recognition-jobs, upload-store, helpers
 
 ## 验证标准
 

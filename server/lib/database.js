@@ -40,7 +40,7 @@ function initSchema() {
       suggestion TEXT,
       origin TEXT,
       control_methods TEXT,
-      created_at TEXT DEFAULT (datetime('now'))
+      created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
     );
 
     CREATE TABLE IF NOT EXISTS reports (
@@ -56,7 +56,7 @@ function initSchema() {
       address TEXT DEFAULT '',
       remark TEXT DEFAULT '',
       status TEXT DEFAULT 'pending',
-      created_at TEXT DEFAULT (datetime('now')),
+      created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
       FOREIGN KEY (species_id) REFERENCES species(id) ON DELETE SET NULL
     );
 
@@ -67,7 +67,7 @@ function initSchema() {
       action TEXT NOT NULL,
       final_species_id TEXT,
       comment TEXT DEFAULT '',
-      created_at TEXT DEFAULT (datetime('now')),
+      created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
       FOREIGN KEY (report_id) REFERENCES reports(id) ON DELETE CASCADE
     );
 
@@ -77,7 +77,7 @@ function initSchema() {
       password_hash TEXT NOT NULL,
       role TEXT DEFAULT 'user' CHECK(role IN ('user','reviewer','admin')),
       openid TEXT UNIQUE,
-      created_at TEXT DEFAULT (datetime('now'))
+      created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
     );
 
     CREATE INDEX IF NOT EXISTS idx_reports_status ON reports(status);
@@ -88,7 +88,7 @@ function initSchema() {
     CREATE TABLE IF NOT EXISTS points (
       user_id TEXT PRIMARY KEY,
       total INTEGER DEFAULT 0,
-      updated_at TEXT DEFAULT (datetime('now'))
+      updated_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
     );
 
     CREATE TABLE IF NOT EXISTS points_log (
@@ -97,7 +97,7 @@ function initSchema() {
       amount INTEGER NOT NULL,
       action TEXT NOT NULL,
       reference_id TEXT,
-      created_at TEXT DEFAULT (datetime('now'))
+      created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
     );
 
     CREATE TABLE IF NOT EXISTS products (
@@ -117,7 +117,7 @@ function initSchema() {
       id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL,
       product_id TEXT NOT NULL,
-      created_at TEXT DEFAULT (datetime('now'))
+      created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
     );
 
     CREATE TABLE IF NOT EXISTS orders (
@@ -128,8 +128,8 @@ function initSchema() {
       shipping_name TEXT DEFAULT '',
       shipping_phone TEXT DEFAULT '',
       shipping_address TEXT DEFAULT '',
-      created_at TEXT DEFAULT (datetime('now')),
-      updated_at TEXT DEFAULT (datetime('now'))
+      created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+      updated_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
     );
 
     CREATE TABLE IF NOT EXISTS product_categories (
@@ -141,7 +141,7 @@ function initSchema() {
     CREATE TABLE IF NOT EXISTS user_credit (
       user_id TEXT PRIMARY KEY,
       score INTEGER DEFAULT 100,
-      updated_at TEXT DEFAULT (datetime('now'))
+      updated_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
     );
 
     CREATE TABLE IF NOT EXISTS image_fingerprints (
@@ -150,7 +150,7 @@ function initSchema() {
       file_size INTEGER,
       width INTEGER,
       height INTEGER,
-      created_at TEXT DEFAULT (datetime('now'))
+      created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
     );
 
     CREATE TABLE IF NOT EXISTS leaderboard_snapshot (
@@ -158,7 +158,7 @@ function initSchema() {
       week_start TEXT NOT NULL,
       type TEXT NOT NULL DEFAULT 'weekly',
       rank_data TEXT NOT NULL,
-      created_at TEXT DEFAULT (datetime('now'))
+      created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
     );
 
     CREATE INDEX IF NOT EXISTS idx_points_log_user ON points_log(user_id);
@@ -175,7 +175,7 @@ function initSchema() {
       type TEXT NOT NULL DEFAULT 'info',
       reference_id TEXT,
       is_read INTEGER DEFAULT 0,
-      created_at TEXT DEFAULT (datetime('now'))
+      created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
     );
 
     CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);
@@ -184,7 +184,7 @@ function initSchema() {
       id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL,
       achievement_key TEXT NOT NULL,
-      earned_at TEXT DEFAULT (datetime('now')),
+      earned_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
       UNIQUE(user_id, achievement_key)
     );
 
@@ -624,7 +624,7 @@ function addPoints(userId, amount, action, referenceId) {
   const d = getDb();
   const existing = d.prepare("SELECT * FROM points WHERE user_id = ?").get(userId);
   if (existing) {
-    d.prepare("UPDATE points SET total = total + ?, updated_at = datetime('now') WHERE user_id = ?").run(amount, userId);
+    d.prepare("UPDATE points SET total = total + ?, updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE user_id = ?").run(amount, userId);
   } else {
     d.prepare("INSERT INTO points (user_id, total) VALUES (?, ?)").run(userId, Math.max(0, amount));
   }
@@ -690,7 +690,7 @@ function createPurchase(userId, productId) {
       return { error: "Insufficient points" };
     }
 
-    d.prepare("UPDATE points SET total = total - ?, updated_at = datetime('now') WHERE user_id = ?").run(product.points_cost, userId);
+    d.prepare("UPDATE points SET total = total - ?, updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE user_id = ?").run(product.points_cost, userId);
     d.prepare("INSERT INTO purchases (id, user_id, product_id) VALUES (?, ?, ?)").run(purchaseId, userId, productId);
     d.prepare("UPDATE products SET stock = stock - 1 WHERE id = ?").run(productId);
     return null;
@@ -878,7 +878,7 @@ function updateUserCredit(userId, delta) {
   const d = getDb();
   const existing = d.prepare("SELECT * FROM user_credit WHERE user_id = ?").get(userId);
   if (existing) {
-    d.prepare("UPDATE user_credit SET score = MAX(0, score + ?), updated_at = datetime('now') WHERE user_id = ?").run(delta, userId);
+    d.prepare("UPDATE user_credit SET score = MAX(0, score + ?), updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE user_id = ?").run(delta, userId);
   } else {
     d.prepare("INSERT INTO user_credit (user_id, score) VALUES (?, MAX(0, 100 + ?))").run(userId, delta);
   }
@@ -993,7 +993,7 @@ function createReportWithPoints(payload) {
   return {
     report,
     pointsDelta,
-    isDupe: false  // if isDupe was true we still created but didn't award points (handled above)
+    isDupe  // reflects geotemporal dedup check result; caller (index.js) handles points suppression
   };
 }
 
@@ -1093,7 +1093,7 @@ function createPurchaseFull(userId, productId, shippingInfo) {
       return { error: "Insufficient points" };
     }
 
-    d.prepare("UPDATE points SET total = total - ?, updated_at = datetime('now') WHERE user_id = ?").run(product.points_cost, userId);
+    d.prepare("UPDATE points SET total = total - ?, updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE user_id = ?").run(product.points_cost, userId);
     d.prepare("UPDATE products SET stock = stock - 1 WHERE id = ?").run(productId);
 
     // Record purchase
@@ -1161,7 +1161,7 @@ function getOrdersByUser(userId) {
 }
 
 function updateOrderStatus(orderId, status) {
-  getDb().prepare("UPDATE orders SET status = ?, updated_at = datetime('now') WHERE id = ?").run(status, orderId);
+  getDb().prepare("UPDATE orders SET status = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = ?").run(status, orderId);
 }
 
 // --- Leaderboard ---

@@ -18,7 +18,9 @@
 }
 ```
 
-返回：JWT token + 用户信息。用户名需 >= 3 字符，密码 >= 4 字符。默认角色为 `user`。
+返回：JWT token + 用户信息。用户名需 >= 3 字符，密码 >= 8 字符。默认角色为 `user`。
+
+> ⚠️ 注意：注册时 `role` 参数传 `reviewer` 会被强制降为 `user`（只有 admin 能建审核员账号）。
 
 ### `POST /api/auth/login`
 
@@ -35,6 +37,7 @@
 返回 JWT token，后续需要认证的接口在 Header 中携带 `Authorization: Bearer <token>`。
 
 **预置账号：**
+- 管理员: `admin` / `admin123` (role: admin)
 - 审核员: `reviewer` / `review123` (role: reviewer)
 - 普通用户: `demo` / `demo123` (role: user)
 
@@ -142,3 +145,38 @@ Header: `Authorization: Bearer <token>`
 ## `GET /api/stats`
 
 返回总上报数、待审核数、已确认数、已驳回数、物种数。
+
+## `POST /api/auth/wx-login`
+
+微信 code 登录（也支持 mock 模式）。
+
+- 正式环境：需配置 `WECHAT_APPID` + `WECHAT_SECRET`，自动用微信接口换 openid
+- 开发模式：`WECHAT_APPID` 未配置时，用 `dev-{code}` 作为 openid，适合本地调试
+
+## `GET /api/leaderboard`
+
+排行榜（无需认证）。返回周榜、总榜、新秀榜数据。
+
+## `GET /api/shop/products`
+
+商品列表（含分类）。返回虚拟商品（cat-digital）和实物商品（cat-physical）。
+
+## `POST /api/shop/orders` 🔒 需认证
+
+创建订单。实物商品需传 `shippingAddress`。
+
+## `GET /api/shop/orders/:userId` 🔒 需认证
+
+查询用户订单列表。
+
+## `GET /api/user/privileges` 🔒 需认证
+
+查询当前用户权限（徽章等级、日报上报配额等）。
+
+## `GET /api/reports/my` 🔒 需认证
+
+查询当前用户的上报记录（需带 JWT）。
+
+## `GET /api/reports/export/csv` 🔒 需认证
+
+导出已核实数据为 CSV（含物种详情、经纬度、时间）。
