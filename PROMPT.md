@@ -8,7 +8,7 @@
 ## 项目概览
 
 **项目名称**: 外来物种哨兵 (Invasive Species Reporter)  
-**版本**: v0.6.0  
+**版本**: v0.7.0  
 **技术栈**: 微信小程序 + Node.js/Express + SQLite + 智谱AI视觉识别  
 **根目录**: `C:/Users/admin/source/repos/invasive-species-reporter`
 

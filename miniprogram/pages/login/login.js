@@ -23,7 +23,7 @@ Page({
 
   async onLogin() {
     var username = this.data.username.trim();
-    var password = this.data.password;
+    var password = this.data.password.trim();
 
     if (!username || !password) {
       this.setData({ error: "请填写用户名和密码" });
@@ -46,7 +46,7 @@ Page({
 
   async onRegister() {
     var username = this.data.username.trim();
-    var password = this.data.password;
+    var password = this.data.password.trim();
 
     if (!username || !password) {
       this.setData({ error: "请填写用户名和密码" });

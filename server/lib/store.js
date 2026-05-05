@@ -180,6 +180,14 @@ function getLeaderboard(type, limit) {
   return db.getLeaderboard(type, limit);
 }
 
+function updateUserAvatar(userId, avatarUrl) {
+  return db.updateUserAvatar(userId, avatarUrl);
+}
+
+function getUserProfile(userId) {
+  return db.getUserProfile(userId);
+}
+
 module.exports = {
   getSpeciesList,
   getSpeciesById,
@@ -217,5 +225,7 @@ module.exports = {
   createPurchaseFull,
   getOrdersByUser,
   updateOrderStatus,
-  getLeaderboard
+  getLeaderboard,
+  updateUserAvatar,
+  getUserProfile
 };

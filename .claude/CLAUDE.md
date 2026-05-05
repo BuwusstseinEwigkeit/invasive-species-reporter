@@ -33,14 +33,50 @@
 3. ~~🟡 isDupe 返回值死代码~~ — index.js 独立计算 isDupe，database.js 返回值不影响实际行为
 4. ~~🟡 created_at 时区混用~~ — 已修复：所有 `datetime('now')` → `strftime('%Y-%m-%dT%H:%M:%SZ', 'now')`，新记录统一 UTC ISO 8601
 5. ~~🟡 CSV 导出无 expert 徽章权限校验~~ — 已修复，index.js 已有权限判断
-6. 🟡 图片去重可绕过：MD5 可通过重命名绕过，pHash 升级方案已设计（blockhash-core + 双key迁移），尚未实现
-7. 🟡 geo dedup timezone mismatch：函数内部 now() 已统一 UTC，但 200m/12h 阈值参数需实测验证
+6. ~~🔴 任意用户积分操纵~~ — 已修复：POST /api/points/:userId 增加 userId 校验
+7. ~~🔴 未认证可创建上报~~ — 已修复：POST /api/reports 改为 authRequired
+8. ~~🔴 购买记录可被他人查看~~ — 已修复：GET /api/shop/purchases/:userId 增加认证+userId校验
+9. ~~🔴 硬编码管理员凭据~~ — 已修复：种子账号改为环境变量管理
+10. ~~🟡 ID 碰撞风险~~ — 已修复：所有 ID 生成改用 crypto.randomUUID()
+11. ~~🟡 内存 Map 无 TTL~~ — 已修复：upload-store 和 recognition-jobs 增加定时清理
+12. 🟡 图片去重可绕过：MD5 可通过重命名绕过，pHash 升级方案已设计（blockhash-core + 双key迁移），尚未实现
+13. 🟡 geo dedup timezone mismatch：函数内部 now() 已统一 UTC，但 200m/12h 阈值参数需实测验证
+14. 🟡 database.js God Object：1300+ 行，建议拆分为 schema + repository 模块（待后续迭代）
+15. 🟡 store.js 纯透传层：建议消除或转型为业务服务层
 
 ## 上下文管理
 
 - 当会话上下文接近用完时（token 计数高），用 `TASK.md` 保存进度后重启
 - 重启后读取 `PROMPT.md` 和 `.claude/CLAUDE.md` 恢复上下文
 - 复杂调研始终走子 Agent，不要把大量搜索结果塞进主上下文
+
+## Codex 协作流程（审查模式）
+
+**Token 节约原则（必读）：**
+- Codex 只读 handoff diff，不要塞完整代码
+- diff 压缩：`git diff --stat` 先看改了哪些文件，再针对高风险文件读 diff
+- Codex 回复尽量简短，一条 diff 不超过 3 个问题
+
+**Claude Code 写完代码后：**
+1. 追加 `docs/archive/HANDOFF.md` 本次完成记录
+2. Codex 读取 `docs/archive/HANDOFF.md` 的最新一节
+3. Codex 结合 git diff 做安全/性能/可维护性审查
+4. Claude Code 收到反馈后修复
+
+**Handoff 格式（Claude Code 写，Codex 读）：**
+```markdown
+## 本次完成 [YYYY-MM-DD]
+- 完成了：xxx
+- 涉及文件：file1.js, file2.js
+- 关键逻辑：xxx（供 Codex 重点看）
+- 待确认：xxx（有疑问的地方）
+```
+
+**Codex 审查关注点（按优先级）：**
+1. 安全：SQL注入、XSS、权限绕过
+2. 边界：空值/undefined/异常输入处理
+3. 性能：N+1 查询、大数据量
+4. 可维护：命名清晰、函数不过长
 
 ## 服务端结构
 

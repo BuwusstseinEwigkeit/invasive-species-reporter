@@ -83,13 +83,35 @@
   - 描述: Node.js 网关通过 HTTP 调用 Python 识别微服务
   - 验收: 图片识别请求可以路由到 Python 服务
 
+## Phase 6: 安全修复 + UX 优化 + 工程改进 (P0/P1) — v0.7.0
+
+- [x] **6.1 权限漏洞修复** — 积分操纵/匿名上报/购买记录泄露/硬编码凭据 4 个安全漏洞全部修复
+- [x] **6.2 UX 优化** — 登录拦截/GPS 快捷定位/压缩选项隐藏/callout 点击展开/状态动画/头像并发下载
+- [x] **6.3 ID 碰撞修复** — 所有 ID 生成改用 crypto.randomUUID()
+- [x] **6.4 内存泄漏修复** — upload-store 和 recognition-jobs 增加 TTL 定时清理
+- [x] **6.5 安全测试** — 新增 tests/security.test.js，22 个测试用例
+
+## Phase 7: 工程重构 (P1) — 待开始
+
+- [ ] **7.1 database.js 拆分** — 将 1300+ 行的 God Object 拆分为 db-schema.js / db-reports.js / db-users.js / db-shop.js
+- [ ] **7.2 store.js 重构** — 消除纯透传层，将 ensureInitialized 逻辑移入 database.js 懒初始化
+- [ ] **7.3 积分系统整理** — 审查 points 表 vs user_credit 表的职责边界，消除冗余
+- [ ] **7.4 测试覆盖扩充** — 补充路由层单元测试（商城、通知、排行榜）
+
+## Phase 8: 运维就绪 (P2) — 待开始
+
+- [ ] **8.1 PM2 进程管理** — 添加 ecosystem.config.js，支持崩溃重启
+- [ ] **8.2 SQLite 备份策略** — 定时备份脚本 + 恢复文档
+- [ ] **8.3 图片存储迁移** — 迁移到腾讯云 COS / 阿里云 OSS
+- [ ] **8.4 CI/CD 自动化** — GitHub Actions 自动运行测试 + 部署
+
 ---
 
 ## 工作进度
 
-**当前迭代轮次**: 1  
-**最后更新**: 2026-04-25  
-**当前活跃任务**: 无（所有任务已完成）
+**当前迭代轮次**: 2  
+**最后更新**: 2026-05-02  
+**当前活跃任务**: 无（Phase 6 全部完成）
 
 ### 完成记录
 
@@ -109,3 +131,8 @@
 | 2026-04-25 | 4.3 消息通知系统 | 新增 notifications 表，审核通过/驳回时自动创建通知，新增通知页面及未读标记 |
 | 2026-04-25 | 5.1 Python 微服务 | 新建 python-service/ 目录，含 Flask 应用、Dockerfile、requirements.txt；docker-compose.yml 编排 Python 服务 |
 | 2026-04-25 | 5.2 Node.js↔Python 集成 | 新增 recognizeWithPython 提供商，JSON/base64 方式调用 Python 服务，配置 PYTHON_RECOGNITION_URL 即可启用 |
+| 2026-05-02 | 6.1 权限漏洞修复 | 积分操纵/匿名上报/购买记录泄露/硬编码凭据 4 个 🔴 漏洞 + 错误脱敏 + 前端凭据移除 |
+| 2026-05-02 | 6.2 UX 优化 | 登录拦截、GPS 快捷定位、压缩选项隐藏、callout BYCLICK、状态动画、头像并发下载 |
+| 2026-05-02 | 6.3 ID 碰撞修复 | report/user ID 从 Date.now() 改为 crypto.randomUUID() |
+| 2026-05-02 | 6.4 内存泄漏修复 | upload-store (1h TTL) 和 recognition-jobs (2h TTL) 定时清理 |
+| 2026-05-02 | 6.5 安全测试 | tests/security.test.js 22 个用例覆盖认证、权限、隐私、ID 唯一性 |

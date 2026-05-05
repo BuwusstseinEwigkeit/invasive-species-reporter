@@ -229,6 +229,11 @@ function initSchema() {
     d.exec("ALTER TABLE products ADD COLUMN sort_order INTEGER DEFAULT 0");
   } catch (_e) { /* column already exists */ }
 
+  // --- Migrate users table (add avatar) ---
+  try {
+    d.exec("ALTER TABLE users ADD COLUMN avatar_url TEXT DEFAULT ''");
+  } catch (_e) { /* column already exists */ }
+
   // --- Migrate reports table ---
   try {
     d.exec("ALTER TABLE reports ADD COLUMN image_fingerprint TEXT");
@@ -374,6 +379,7 @@ function rowToUser(row) {
     passwordHash: row.password_hash,
     role: row.role,
     openid: row.openid,
+    avatarUrl: row.avatar_url || "",
     createdAt: row.created_at
   };
 }
@@ -444,7 +450,7 @@ function getReportById(id) {
 
 function createReport(payload) {
   const d = getDb();
-  const id = `report-${Date.now()}`;
+  const id = `report-${crypto.randomUUID()}`;
   d.prepare(`
     INSERT INTO reports (id, user_id, species_id, ai_top1, ai_score, ai_candidates, image_url, latitude, longitude, address, remark, status)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
@@ -549,7 +555,7 @@ function verifyPassword(password, storedHash) {
 
 function createUser(username, password, role = "user") {
   const d = getDb();
-  const id = `user-${Date.now()}`;
+  const id = `user-${crypto.randomUUID()}`;
   try {
     d.prepare("INSERT INTO users (id, username, password_hash, role) VALUES (?, ?, ?, ?)").run(
       id, username, hashPassword(password), role
@@ -580,7 +586,7 @@ function getUserByOpenId(openid) {
 
 function createUserFromOpenId(openid, username) {
   const d = getDb();
-  const id = `user-${Date.now()}`;
+  const id = `user-${crypto.randomUUID()}`;
   // Generate a random password hash using cryptographically secure random (not used for WeChat login)
   const randomHash = hashPassword(crypto.randomBytes(16).toString("hex"));
   const displayName = username || `wx_${openid.slice(-8)}`;
@@ -595,6 +601,24 @@ function authenticateUser(username, password) {
   if (!user) return null;
   if (!verifyPassword(password, user.passwordHash)) return null;
   return user;
+}
+
+function updateUserAvatar(userId, avatarUrl) {
+  const d = getDb();
+  d.prepare("UPDATE users SET avatar_url = ? WHERE id = ?").run(avatarUrl || "", userId);
+  return getUserById(userId);
+}
+
+function getUserProfile(userId) {
+  const user = getUserById(userId);
+  if (!user) return null;
+  return {
+    id: user.id,
+    username: user.username,
+    role: user.role,
+    avatarUrl: user.avatarUrl,
+    createdAt: user.createdAt
+  };
 }
 
 // --- Points queries ---
@@ -944,7 +968,7 @@ function checkGeotemporalDuplicate(userId, latitude, longitude) {
 
 function createReportWithPoints(payload) {
   const d = getDb();
-  const id = `report-${Date.now()}`;
+  const id = `report-${crypto.randomUUID()}`;
 
   // Determine if this is first report
   const existingReports = d.prepare("SELECT COUNT(*) as c FROM reports WHERE user_id = ?").get(payload.userId || "user-anonymous");
@@ -1273,6 +1297,8 @@ module.exports = {
   authenticateUser,
   hashPassword,
   verifyPassword,
+  updateUserAvatar,
+  getUserProfile,
   getPoints,
   addPoints,
   getProducts,

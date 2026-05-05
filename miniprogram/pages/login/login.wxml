@@ -58,10 +58,7 @@
     </view>
 
     <view class="demo-hint">
-      <text class="muted demo-title">演示账号</text>
-      <text class="muted">管理员：admin / admin123</text>
-      <text class="muted">审核员：reviewer / review123</text>
-      <text class="muted">普通用户：demo / demo123</text>
+      <text class="muted">请联系管理员获取账号</text>
     </view>
   </view>
 </view>

@@ -414,11 +414,11 @@ const productCategories = [
 const products = [
   // 数字权益
   {
-    id: "product-export-once",
-    name: "数据导出（单次）",
-    description: "导出全部已核实数据为CSV文件，单次有效。",
-    pointsCost: 100,
-    imageUrl: "/static/products/product-export.png",
+    id: "product-avatar-frame",
+    name: "限定头像框",
+    description: "个人主页显示专属头像框。",
+    pointsCost: 80,
+    imageUrl: "/static/products/product-001.png",
     stock: 9999,
     categoryId: "cat-digital",
     isVirtual: 1,
@@ -426,40 +426,16 @@ const products = [
     sortOrder: 1
   },
   {
-    id: "product-export-week",
-    name: "数据导出（7天）",
-    description: "7天内不限次数导出已核实数据。",
-    pointsCost: 200,
-    imageUrl: "/static/products/product-export-week.png",
-    stock: 9999,
-    categoryId: "cat-digital",
-    isVirtual: 1,
-    requirement: "{\"achievement\":\"expert\"}",
-    sortOrder: 2
-  },
-  {
-    id: "product-avatar-frame",
-    name: "限定头像框",
-    description: "个人主页显示专属头像框。",
-    pointsCost: 80,
-    imageUrl: "/static/products/product-frame.png",
-    stock: 9999,
-    categoryId: "cat-digital",
-    isVirtual: 1,
-    requirement: "",
-    sortOrder: 3
-  },
-  {
     id: "product-showcase",
     name: "排行榜展示位",
     description: "个人主页置顶昵称展示一周。",
     pointsCost: 150,
-    imageUrl: "/static/products/product-showcase.png",
+    imageUrl: "/static/products/product-002.png",
     stock: 9999,
     categoryId: "cat-digital",
     isVirtual: 1,
     requirement: "",
-    sortOrder: 4
+    sortOrder: 2
   },
   // 实物兑换
   {
@@ -467,36 +443,36 @@ const products = [
     name: "哨点贴纸包",
     description: "定制入侵物种主题贴纸，一套6张。",
     pointsCost: 30,
-    imageUrl: "/static/products/product-stickers.png",
+    imageUrl: "/static/products/product-003.png",
     stock: 200,
     categoryId: "cat-physical",
     isVirtual: 0,
     requirement: "",
-    sortOrder: 5
+    sortOrder: 3
   },
   {
     id: "product-badge",
     name: "哨点小徽章",
     description: "珐琅工艺纪念徽章。",
     pointsCost: 80,
-    imageUrl: "/static/products/product-badge.png",
+    imageUrl: "/static/products/product-004.png",
     stock: 100,
     categoryId: "cat-physical",
     isVirtual: 0,
     requirement: "",
-    sortOrder: 6
+    sortOrder: 4
   },
   {
     id: "product-certificate",
     name: "参与证书",
     description: "官方样式纸质参与证书。",
     pointsCost: 100,
-    imageUrl: "/static/products/product-cert.png",
+    imageUrl: "/static/products/product-001.png",
     stock: 500,
     categoryId: "cat-physical",
     isVirtual: 0,
     requirement: "",
-    sortOrder: 7
+    sortOrder: 5
   }
 ];
 

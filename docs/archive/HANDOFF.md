@@ -45,6 +45,49 @@
 - Do not remove async job flow; front-end already depends on it.
 - Database schema is in `server/lib/database.js` → `initSchema()`
 
+## Completed (v0.7.0 — 安全修复 + UX 优化 + 工程改进)
+
+### 安全修复
+1. ✅ **任意用户积分操纵修复** — `POST /api/points/:userId` 增加 `req.user.userId === req.params.userId` 校验，跨用户操作返回 403
+2. ✅ **未认证上报拦截** — `POST /api/reports` 改为 `authRequired`，移除 anonymous 静默回退
+3. ✅ **购买记录隐私保护** — `GET /api/shop/purchases/:userId` 增加 `authRequired` + userId 校验
+4. ✅ **硬编码凭据移除** — 种子账号改为环境变量管理（`ADMIN_PASS`, `REVIEWER_PASS`, `DEMO_PASS`），代码中不再硬编码密码
+5. ✅ **错误信息脱敏** — 生产环境错误处理返回通用消息，不泄露内部堆栈
+6. ✅ **前端演示账号移除** — 登录页移除明文账号展示，审核台移除硬编码自动登录
+
+### UX 优化
+7. ✅ **上报登录拦截** — 进入上报页即检测 token，未登录弹窗引导登录
+8. ✅ **GPS 快捷定位** — 新增"使用当前位置"按钮，配合"手动选择"双入口
+9. ✅ **压缩选项隐藏** — 移除压缩选择器 UI，固定使用标准(60)质量
+10. ✅ **地图 callout 优化** — `display: "ALWAYS"` → `"BYCLICK"`，点击才展开气泡
+11. ✅ **上传状态动画** — 灰色文字 → 彩色状态栏 + CSS spinner 动画（上传蓝/识别黄/完成绿）
+12. ✅ **首页头像并发下载** — 串行递归 → 3 并发下载，首屏加载提速
+
+### 工程改进
+13. ✅ **ID 碰撞修复** — `report-${Date.now()}` / `user-${Date.now()}` 统一改为 `crypto.randomUUID()` 格式
+14. ✅ **内存泄漏修复** — upload-store.js 和 recognition-jobs.js 增加 TTL 定时清理（上传 1h/任务 2h 过期）
+15. ✅ **安全测试用例** — 新增 `tests/security.test.js`，22 个测试覆盖认证、权限、隐私、ID 唯一性
+
+### 涉及文件
+- `server/routes/user.js` — 积分接口加 userId 校验
+- `server/routes/reports.js` — 上报接口强制认证
+- `server/routes/shop.js` — 购买记录加认证 + userId 校验
+- `server/index.js` — 种子账号环境变量化、错误处理脱敏
+- `server/lib/database.js` — ID 生成改用 UUID
+- `server/lib/upload-store.js` — TTL 清理
+- `server/lib/recognition-jobs.js` — TTL 清理
+- `miniprogram/pages/report/report.wxml` — 登录拦截、GPS 按钮、状态动画
+- `miniprogram/pages/report/report.js` — 登录检测、GPS 定位
+- `miniprogram/pages/report/report.wxss` — 状态栏样式
+- `miniprogram/pages/map/map.js` — callout BYCLICK
+- `miniprogram/pages/home/home.js` — 并发头像下载
+- `miniprogram/pages/login/login.wxml` — 移除明文账号
+- `miniprogram/utils/api.js` — 移除硬编码审核员登录
+- `tests/security.test.js` — 22 个安全测试
+- `.env.example` — 种子账号环境变量文档
+
+---
+
 ## Completed (v0.6.1)
 
 1. ✅ **API 错误格式统一化** — 所有端点使用 `sendError(res, error, code)` / `sendSuccess(res, data, statusCode)` 统一格式
@@ -83,6 +126,12 @@
 - 14 个测试用例覆盖核心功能
 - 包含健康检查、登录、CRUD、认证、文件上传等
 - 执行日期: 2026-04-25，13/14 通过（图片上传测试脚本需修复）
+
+## 已知运维问题（2026-04-29）
+
+✅ **静态文件 404 — 已修复**：在 `app.listen` 前增加启动时静态文件健康检查（`species-001.jpg` 存在性验证），进程启动即确认静态资源可用，不再依赖用户发现 404。
+- **根因**：旧会话遗留进程（PID 23800）持有内存旧代码，`express.static` 挂载顺序在旧代码中异常
+- **修复**：新增 `index.js` 启动健康检查，文件缺失则 `process.exit(1)`
 
 ## Recommended Next Steps
 

@@ -66,18 +66,19 @@
 - `database.js`：SQLite 底层建表 + 种子数据 + 查询封装
 - `store.js`：数据访问包装层（调用 database.js）
 - `recognition.js`：5 级识别降级链（智谱 GLM-4V → Moonshot/Kimi → Ollama → Python 微服务 → Mock 兜底）
-- `recognition-jobs.js`：异步识别任务管理（内存 Map，最多重试 2 次）
-- `upload-store.js`：上传文件注册表（内存 Map）
+- `recognition-jobs.js`：异步识别任务管理（内存 Map，2h TTL 自动清理，最多重试 2 次）
+- `upload-store.js`：上传文件注册表（内存 Map，1h TTL 自动清理）
 - `helpers.js`：响应工具函数（sendError, sendSuccess, getPublicBaseUrl）
 
 ### 测试层（tests/）
 - `anti-spam.test.js`：25 个反垃圾机制单元测试（SQLite 内存模式）
 - `golden-path.test.js`：15 个集成测试（supertest + 内存 SQLite），覆盖注册→登录→上报→审核→积分→成就 全流程
+- `security.test.js`：22 个安全测试，覆盖认证拦截、权限校验、隐私保护、ID 唯一性
 
 ## 技术决策
 
 - **SQLite**：轻量、零配置、适合个人项目
 - **sharp**：图片内容验证（防止恶意文件伪装）
 - **JWT**：7 天过期，用于所有需要认证的接口
-- **bcrypt**：密码哈希
+- **pbkdf2**：密码哈希（100000 迭代，sha512，随机 salt）
 - **微信 mock 登录**：无 WECHAT_APPID 时用 `dev-{code}` 作为 openid，方便本地开发

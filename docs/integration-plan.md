@@ -1,20 +1,22 @@
 # 外来物种项目整合方案
 
+> **⚠️ 已过时（2026-05-05）**：本文档描述的双项目整合方案已不再适用。原 `外来物种识别项目`（Python/Flask）目录已删除，识别能力已整合进主项目的五级降级链（智谱 → Kimi → Ollama → Mock）。保留本文档供历史参考。
+
+---
+
 ## 项目背景
 
-目前存在两个独立的外来物种相关项目：
+~~目前存在两个独立的外来物种相关项目：~~
 
-1. **`invasive-species-reporter`** (Node.js上报系统)
+1. **`invasive-species-reporter`** (Node.js上报系统) — **活跃**
    - 路径: `C:/Users/admin/source/repos/invasive-species-reporter/`
-   - 技术栈: Node.js + Express + 微信小程序
+   - 技术栈: Node.js + Express + 微信小程序 + SQLite
    - 功能: 用户上报→AI识别→人工审核→地图展示完整闭环
-   - 识别方式: 智谱视觉模型API (GLM-4.6v-flash)
+   - 识别方式: 智谱 GLM-4V → Kimi → Ollama → Mock（五级降级链）
 
-2. **`外来物种识别项目`** (Python识别引擎)
-   - 路径: `C:/Users/admin/外来物种识别项目/`
-   - 技术栈: Python/Flask + PyTorch + SQLite
-   - 功能: 百度AI API集成 + 自定义深度学习模型训练
-   - 识别方式: 百度AI开放平台 + 未来自研模型
+2. **~~`外来物种识别项目`~~** (Python识别引擎) — **已删除**
+   - ~~路径: `C:/Users/admin/外来物种识别项目/`~~
+   - 识别能力已通过 Ollama 本地模型整合进主项目
 
 ## 整合目标
 

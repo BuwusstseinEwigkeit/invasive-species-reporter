@@ -81,25 +81,14 @@ router.get("/export/csv", authRequired, (_req, res) => {
 });
 
 // POST /api/reports
-router.post("/", (req, res) => {
+router.post("/", authRequired, (req, res) => {
   try {
-    let reportUserId = "";
-    try {
-      const token = (req.headers.authorization || "").replace("Bearer ", "");
-      if (token) {
-        const decoded = jwt.verify(token, JWT_SECRET);
-        if (decoded.userId) reportUserId = decoded.userId;
-      }
-    } catch (_e) { /* ignore */ }
+    const userId = req.user.userId;
 
-    const userId = reportUserId || "user-anonymous";
-
-    if (userId !== "user-anonymous") {
-      const limit = checkReportLimit(userId);
-      if (!limit.allowed) {
-        sendError(res, `今日上报已达上限（每日${limit.dailyLimit}次），信用分过低请保持良好记录。`, 429);
-        return;
-      }
+    const limit = checkReportLimit(userId);
+    if (!limit.allowed) {
+      sendError(res, `今日上报已达上限（每日${limit.dailyLimit}次），信用分过低请保持良好记录。`, 429);
+      return;
     }
 
     const { fileId, latitude, longitude } = req.body || {};
@@ -124,7 +113,7 @@ router.post("/", (req, res) => {
     }
 
     let isDupe = false;
-    if (userId !== "user-anonymous" && latitude && longitude) {
+    if (latitude && longitude) {
       isDupe = checkGeotemporalDuplicate(userId, latitude, longitude);
     }
 
@@ -144,7 +133,7 @@ router.post("/", (req, res) => {
 
     const result = createReportWithPoints(reportPayload);
 
-    if (userId !== "user-anonymous" && !isDupe) {
+    if (!isDupe) {
       try {
         const newlyEarned = checkAndAwardAchievements(userId);
         if (newlyEarned.length > 0) {
@@ -156,8 +145,8 @@ router.post("/", (req, res) => {
     res.status(201).json({
       item: result.report,
       message: isDupe
-        ? "Report created (duplicate location, no points awarded)."
-        : "Report created and waiting for review.",
+        ? "上报已创建（重复位置，不发放积分）。"
+        : "上报已创建，等待审核。",
       pointsDelta: isDupe ? [] : result.pointsDelta,
     });
   } catch (error) {

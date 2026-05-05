@@ -76,6 +76,25 @@
   border: 3rpx solid #ffffff;
 }
 
+.avatar-edit-hint {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(0, 0, 0, 0.5);
+  color: #ffffff;
+  font-size: 18rpx;
+  text-align: center;
+  padding: 4rpx 0;
+  border-radius: 0 0 50% 50%;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.user-avatar-wrap:active .avatar-edit-hint {
+  opacity: 1;
+}
+
 .user-info {
   flex: 1;
   display: flex;

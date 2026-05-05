@@ -89,25 +89,30 @@ Page({
         filteredSpecies: filtered
       });
 
-      // Download thumbnails in background
+      // Download thumbnails concurrently (max 3 at a time)
       var self = this;
-      function downloadNext(i) {
-        if (i >= resolvedItems.length) return;
+      var concurrency = 3;
+      var index = 0;
+      function downloadNext() {
+        if (index >= resolvedItems.length) return;
+        var i = index++;
         var s = resolvedItems[i];
         if (s.avatar && s.avatar.startsWith("http")) {
           api.downloadImage(s.avatar).then(function (localPath) {
             if (localPath) {
               self.setData({ ["species[" + i + "].avatar"]: localPath });
             }
-            downloadNext(i + 1);
+            downloadNext();
           }).catch(function () {
-            downloadNext(i + 1);
+            downloadNext();
           });
         } else {
-          downloadNext(i + 1);
+          downloadNext();
         }
       }
-      downloadNext(0);
+      for (var c = 0; c < concurrency; c++) {
+        downloadNext();
+      }
     } catch (error) {
       wx.showToast({
         title: "请确认后端服务已启动",

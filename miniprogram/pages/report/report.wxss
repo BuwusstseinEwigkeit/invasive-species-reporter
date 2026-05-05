@@ -80,24 +80,50 @@
   box-sizing: border-box;
 }
 
-.compress-row {
+.status-bar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  background: #f7f7f1;
-  border-radius: 18rpx;
+  gap: 12rpx;
   padding: 16rpx 20rpx;
-}
-
-.compress-label {
+  border-radius: 16rpx;
   font-size: 26rpx;
 }
 
-.compress-picker {
-  font-size: 26rpx;
-  color: #305d3c;
-  font-weight: 500;
-  padding: 4rpx 12rpx;
+.uploading-bar {
+  background: #e8f4fd;
+  color: #1a73e8;
+}
+
+.processing-bar {
+  background: #fff8e1;
+  color: #f9a825;
+}
+
+.success-bar {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.spinner {
+  width: 28rpx;
+  height: 28rpx;
+  border: 4rpx solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.location-row {
+  display: flex;
+  gap: 16rpx;
+}
+
+.location-btn {
+  flex: 1;
 }
 
 .submit-button {

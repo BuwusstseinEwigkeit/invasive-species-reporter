@@ -12,9 +12,10 @@
   <view wx:else>
     <!-- User card -->
     <view class="card user-card">
-      <view class="user-avatar-wrap">
-        <image class="user-avatar-img" src="/images/avatar-placeholder.png" mode="aspectFill" />
+      <view class="user-avatar-wrap" hover-class="hover-tap" bindtap="onChangeAvatar">
+        <image class="user-avatar-img" src="{{avatarUrl || '/images/avatar-placeholder.png'}}" mode="aspectFill" />
         <view class="user-avatar-badge">{{username.slice(0, 1).toUpperCase()}}</view>
+        <view class="avatar-edit-hint">点击修改</view>
       </view>
       <view class="user-info">
         <text class="user-name">{{username}}</text>
@@ -89,11 +90,6 @@
       <view class="menu-item" hover-class="hover-bg" bindtap="goApprovedReports">
         <text class="menu-icon">✅</text>
         <text class="menu-label">已核实记录</text>
-        <text class="menu-arrow">›</text>
-      </view>
-      <view class="menu-item" hover-class="hover-bg" bindtap="onExportData">
-        <text class="menu-icon">📊</text>
-        <text class="menu-label">数据导出</text>
         <text class="menu-arrow">›</text>
       </view>
       <view class="menu-item" hover-class="hover-bg" bindtap="goShop">

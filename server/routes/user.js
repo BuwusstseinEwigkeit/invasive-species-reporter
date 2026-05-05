@@ -11,6 +11,8 @@ const {
   getAllAchievementsWithStatus,
   getUserCredit,
   getUserPrivileges,
+  updateUserAvatar,
+  getUserProfile,
 } = require("../lib/store");
 const { sendError } = require("../lib/helpers");
 
@@ -24,6 +26,10 @@ router.get("/points/:userId", (req, res) => {
 
 // POST /api/points/:userId
 router.post("/points/:userId", authRequired, (req, res) => {
+  if (req.user.userId !== req.params.userId) {
+    sendError(res, "Access denied.", 403);
+    return;
+  }
   const { amount, action, referenceId } = req.body || {};
   if (!amount || !action) {
     sendError(res, "Amount and action are required.", 400);
@@ -81,6 +87,35 @@ router.get("/user/privileges", authRequired, (req, res) => {
   const credit = getUserCredit(req.user.userId);
   const privileges = getUserPrivileges(req.user.userId);
   res.json({ item: { credit, ...privileges } });
+});
+
+// GET /api/user/profile/:userId
+router.get("/user/profile/:userId", authRequired, (req, res) => {
+  if (req.user.userId !== req.params.userId) {
+    sendError(res, "Access denied.", 403);
+    return;
+  }
+  const profile = getUserProfile(req.params.userId);
+  if (!profile) {
+    sendError(res, "User not found.", 404);
+    return;
+  }
+  res.json({ item: profile });
+});
+
+// POST /api/user/avatar
+router.post("/user/avatar", authRequired, (req, res) => {
+  const { avatarUrl } = req.body || {};
+  if (avatarUrl === undefined) {
+    sendError(res, "avatarUrl is required.", 400);
+    return;
+  }
+  const user = updateUserAvatar(req.user.userId, avatarUrl);
+  if (!user) {
+    sendError(res, "User not found.", 404);
+    return;
+  }
+  res.json({ item: { avatarUrl: user.avatarUrl } });
 });
 
 module.exports = router;

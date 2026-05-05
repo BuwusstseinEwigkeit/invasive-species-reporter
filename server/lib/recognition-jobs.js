@@ -4,6 +4,7 @@ const { recognizeSpeciesFromImage } = require("./recognition");
 
 const recognitionJobs = new Map();
 const MAX_JOB_ATTEMPTS = 2;
+const JOB_TTL_MS = 2 * 60 * 60 * 1000; // 2 hours
 
 // Detect retryable errors by message content OR by error object properties
 function isRetryableError(error) {
@@ -70,7 +71,7 @@ function createRecognitionJob({ fileId, speciesList }) {
     result: null,
     error: "",
     attempts: 0,
-    createdAt: new Date().toISOString()
+    createdAt: Date.now()
   };
 
   recognitionJobs.set(jobId, job);
@@ -82,6 +83,16 @@ function createRecognitionJob({ fileId, speciesList }) {
 function getRecognitionJob(jobId) {
   return recognitionJobs.get(jobId) || null;
 }
+
+// Periodic cleanup of expired jobs
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, job] of recognitionJobs) {
+    if (now - job.createdAt > JOB_TTL_MS) {
+      recognitionJobs.delete(key);
+    }
+  }
+}, 10 * 60 * 1000); // every 10 minutes
 
 module.exports = {
   createRecognitionJob,

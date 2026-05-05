@@ -7,6 +7,7 @@ Page({
     username: "",
     role: "",
     userId: "",
+    avatarUrl: "",
     points: 0,
     pointsLogs: [],
     loading: true,
@@ -46,6 +47,7 @@ Page({
         role: role,
         loading: true
       });
+      this.loadAvatar();
       this.loadPoints();
       this.loadUnreadCount();
       this.loadAchievements();
@@ -156,6 +158,48 @@ Page({
     }
   },
 
+  async loadAvatar() {
+    try {
+      var userId = this.data.userId;
+      if (!userId) return;
+      var res = await api.getUserProfile(userId);
+      if (res.item && res.item.avatarUrl) {
+        this.setData({ avatarUrl: api.resolveImageUrl(res.item.avatarUrl) });
+      }
+    } catch (_e) { /* ignore */ }
+  },
+
+  onChangeAvatar() {
+    var self = this;
+    wx.chooseMedia({
+      count: 1,
+      mediaType: ["image"],
+      sourceType: ["album", "camera"],
+      sizeType: ["compressed"],
+      success: function (res) {
+        var tempFilePath = res.tempFiles[0].tempFilePath;
+        wx.showLoading({ title: "上传中..." });
+        api.uploadAvatar(tempFilePath).then(function (uploadRes) {
+          var fullUrl = uploadRes.item ? uploadRes.item.imageUrl : "";
+          // Extract relative path (e.g., "/uploads/xxx.jpg") from full URL
+          var avatarUrl = fullUrl;
+          var baseUrl = app.globalData.apiBaseUrl || "";
+          if (baseUrl && fullUrl.indexOf(baseUrl) === 0) {
+            avatarUrl = fullUrl.substring(baseUrl.length);
+          }
+          return api.updateAvatar(self.data.userId, avatarUrl);
+        }).then(function () {
+          wx.hideLoading();
+          wx.showToast({ title: "头像已更新", icon: "success" });
+          self.loadAvatar();
+        }).catch(function () {
+          wx.hideLoading();
+          wx.showToast({ title: "上传失败，请重试", icon: "none" });
+        });
+      }
+    });
+  },
+
   goNotifications() {
     wx.navigateTo({ url: "/pages/notifications/notifications" });
   },
@@ -180,31 +224,4 @@ Page({
     wx.showToast({ title: "功能开发中", icon: "none" });
   },
 
-  onExportData() {
-    var self = this;
-    wx.showModal({
-      title: "数据导出",
-      content: "将导出所有审核通过的上报记录为 CSV 文件，是否继续？",
-      success(res) {
-        if (res.confirm) {
-          wx.showLoading({ title: "导出中..." });
-          api.exportCsv().then(function (path) {
-            wx.hideLoading();
-            wx.showToast({ title: "导出成功", icon: "success" });
-            // Show the file path so user knows where it is
-            if (path) {
-              wx.showModal({
-                title: "文件已保存",
-                content: "文件路径：" + path + "\n\n您可以在微信文件管理中找到该文件。",
-                showCancel: false
-              });
-            }
-          }).catch(function (err) {
-            wx.hideLoading();
-            wx.showToast({ title: "导出失败，请重试", icon: "none" });
-          });
-        }
-      }
-    });
-  }
 });

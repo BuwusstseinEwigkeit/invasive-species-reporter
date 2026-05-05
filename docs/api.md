@@ -36,10 +36,12 @@
 
 返回 JWT token，后续需要认证的接口在 Header 中携带 `Authorization: Bearer <token>`。
 
-**预置账号：**
-- 管理员: `admin` / `admin123` (role: admin)
-- 审核员: `reviewer` / `review123` (role: reviewer)
-- 普通用户: `demo` / `demo123` (role: user)
+**预置账号（通过环境变量配置）：**
+- 管理员: `ADMIN_USER` / `ADMIN_PASS` (role: admin)
+- 审核员: `REVIEWER_USER` / `REVIEWER_PASS` (role: reviewer)
+- 普通用户: `DEMO_USER` / `DEMO_PASS` (role: user)
+
+> 首次启动时自动创建，密码不在代码中硬编码。详见 `.env.example`。
 
 ## `POST /api/uploads`
 
@@ -107,7 +109,7 @@
 }
 ```
 
-识别提供商链路：**智谱 GLM-4V → (可选：Ollama 本地模型) → Mock 降级**
+识别提供商链路：**智谱 GLM-4V → Moonshot/Kimi → Python 微服务 → Ollama 本地模型 → Mock 降级**
 
 ## `GET /api/species`
 
@@ -121,9 +123,24 @@
 
 查询上报记录，可按状态筛选。
 
-## `POST /api/reports`
+## `POST /api/reports` 🔒 需认证
 
-创建线索上报。
+创建线索上报。需要登录（JWT token）。
+
+Header: `Authorization: Bearer <token>`
+
+请求体：
+```json
+{
+  "speciesId": "species-001",
+  "aiTop1": "加拿大一枝黄花",
+  "aiScore": 0.85,
+  "latitude": 31.9527,
+  "longitude": 118.8927,
+  "address": "南京市玄武区",
+  "remark": "在公园发现"
+}
+```
 
 ## `POST /api/reports/:id/review` 🔒 需认证
 

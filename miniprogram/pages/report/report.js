@@ -39,6 +39,22 @@ Page({
   },
 
   onShow() {
+    if (!api.getToken()) {
+      wx.showModal({
+        title: "请先登录",
+        content: "上报外来物种需要登录账号",
+        confirmText: "去登录",
+        cancelText: "返回",
+        success: (res) => {
+          if (res.confirm) {
+            wx.navigateTo({ url: "/pages/login/login" });
+          } else {
+            wx.switchTab({ url: "/pages/home/home" });
+          }
+        }
+      });
+      return;
+    }
     this.loadSpecies();
   },
 
@@ -254,6 +270,23 @@ Page({
         aiSummary: error.message || "请稍后再试"
       });
     }
+  },
+
+  useCurrentLocation() {
+    wx.getLocation({
+      type: "gcj02",
+      success: (res) => {
+        this.setData({
+          latitude: res.latitude,
+          longitude: res.longitude,
+          address: ""
+        });
+        wx.showToast({ title: "已定位到当前位置", icon: "success" });
+      },
+      fail: () => {
+        wx.showToast({ title: "定位失败，请检查权限", icon: "none" });
+      }
+    });
   },
 
   chooseLocation() {

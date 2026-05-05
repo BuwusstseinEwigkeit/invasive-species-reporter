@@ -35,7 +35,11 @@ router.post("/purchase", authRequired, (req, res) => {
 });
 
 // GET /api/shop/purchases/:userId
-router.get("/purchases/:userId", (req, res) => {
+router.get("/purchases/:userId", authRequired, (req, res) => {
+  if (req.user.userId !== req.params.userId) {
+    sendError(res, "Access denied.", 403);
+    return;
+  }
   res.json({ items: getUserPurchases(req.params.userId) });
 });
 

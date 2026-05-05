@@ -38,17 +38,18 @@ db.seedReports(reports);
 db.seedReviewLogs(reviewLogs);
 db.seedProducts(products);
 
-if (!db.getUserByUsername("admin")) {
-  db.createUser("admin", "admin123", "admin");
-  console.log("[init] Created admin: admin / admin123");
-}
-if (!db.getUserByUsername("reviewer")) {
-  db.createUser("reviewer", "review123", "reviewer");
-  console.log("[init] Created demo reviewer: reviewer / review123");
-}
-if (!db.getUserByUsername("demo")) {
-  db.createUser("demo", "demo123", "user");
-  console.log("[init] Created demo user: demo / demo123");
+// Seed default accounts from env (skip in production if not configured)
+const seedAccounts = [
+  { username: process.env.ADMIN_USER || "admin", password: process.env.ADMIN_PASS, role: "admin" },
+  { username: process.env.REVIEWER_USER || "reviewer", password: process.env.REVIEWER_PASS, role: "reviewer" },
+  { username: process.env.DEMO_USER || "demo", password: process.env.DEMO_PASS, role: "user" },
+];
+for (const acct of seedAccounts) {
+  if (!acct.password) continue; // skip if password not configured
+  if (!db.getUserByUsername(acct.username)) {
+    db.createUser(acct.username, acct.password, acct.role);
+    console.log(`[init] Created ${acct.role} account: ${acct.username}`);
+  }
 }
 console.log("[init] Database ready.");
 
@@ -76,11 +77,25 @@ app.use("/api", require("./routes/misc"));
 // --- Error handler ---
 app.use((error, _req, res, _next) => {
   console.error("[server] request failed:", error);
-  res.status(400).json({ success: false, error: error.message || "Request failed.", code: 400 });
+  const isProduction = process.env.NODE_ENV === "production";
+  res.status(400).json({
+    success: false,
+    error: isProduction ? "请求处理失败，请稍后重试。" : (error.message || "Request failed."),
+    code: 400,
+  });
 });
 
 // --- Start (skip when imported by test runner) ---
 if (require.main === module) {
+  // Startup static file health check — fail fast if static assets missing
+  const staticRoot = path.join(__dirname, "static");
+  const testFile = path.join(staticRoot, "species", "species-001.jpg");
+  if (!fs.existsSync(testFile)) {
+    console.error("[FATAL] Static asset missing:", testFile);
+    process.exit(1);
+  }
+  console.log(`[init] Static files: ${staticRoot}`);
+
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running at http://0.0.0.0:${PORT}`);
   });

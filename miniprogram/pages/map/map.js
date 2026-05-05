@@ -83,7 +83,7 @@ Page({
         padding: 8,
         bgColor: "#ffffff",
         textAlign: "left",
-        display: "ALWAYS"
+        display: "BYCLICK"
       }
     }));
 
@@ -126,11 +126,8 @@ Page({
         radius: 30,
         opacity: 0.7,
         colorGradient: {
-          "0.0": "#7fc8a9",
-          "0.3": "#6abf8b",
-          "0.5": "#e8b435",
-          "0.7": "#e06c3a",
-          "1.0": "#c0392b"
+          points: [0, 0.3, 0.5, 0.7, 1.0],
+          colors: ["#7fc8a9", "#6abf8b", "#e8b435", "#e06c3a", "#c0392b"]
         },
         success: function () {
           console.log("[heatmap] addHeatMap success, points=" + points.length);

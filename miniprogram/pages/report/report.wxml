@@ -15,21 +15,27 @@
       <text class="field-label">现场图片</text>
       <button class="ghost-button" hover-class="hover-scale" bindtap="chooseImage">选择并上传图片</button>
       <image wx:if="{{localImageUrl}}" class="preview-image" src="{{localImageUrl}}" mode="aspectFill" lazy-load />
-      <text class="muted" wx:if="{{isUploading}}">图片上传中...</text>
-      <text class="muted" wx:if="{{uploadedImageUrl && !isUploading}}">图片已上传到服务端</text>
-      <view class="compress-row">
-        <text class="muted compress-label">图片压缩</text>
-        <picker range="{{compressLevels}}" range-key="label" value="{{compressLevelIndex}}" bindchange="onCompressChange">
-          <view class="compress-picker" hover-class="hover-tap">{{compressLevels[compressLevelIndex].label}}</view>
-        </picker>
+      <view class="status-bar uploading-bar" wx:if="{{isUploading}}">
+        <view class="spinner"></view>
+        <text>图片上传中...</text>
       </view>
-      <text class="muted">上传前自动压缩图片，降低上传超时概率。选择"高清"可获得更好的审核查看效果。</text>
+      <view class="status-bar success-bar" wx:if="{{uploadedImageUrl && !isUploading && !isRecognizing}}">
+        <text>图片已上传</text>
+      </view>
+      <view class="status-bar processing-bar" wx:if="{{isRecognizing}}">
+        <view class="spinner"></view>
+        <text>AI 识别中，你可以继续填写...</text>
+      </view>
     </view>
 
     <view class="field">
       <text class="field-label">发现位置</text>
-      <button class="ghost-button" hover-class="hover-scale" bindtap="chooseLocation">选择位置</button>
+      <view class="location-row">
+        <button class="ghost-button location-btn" hover-class="hover-scale" bindtap="useCurrentLocation">使用当前位置</button>
+        <button class="ghost-button location-btn" hover-class="hover-scale" bindtap="chooseLocation">手动选择</button>
+      </view>
       <text class="muted" wx:if="{{address}}">{{address}}</text>
+      <text class="muted" wx:if="{{latitude && !address}}">坐标：{{latitude}}, {{longitude}}</text>
     </view>
 
     <view class="field ai-card">
@@ -38,7 +44,7 @@
         <view class="arrow {{candidatesCollapsed ? '' : 'arrow-down'}}"></view>
       </view>
       <text class="ai-name">{{aiTop1}}</text>
-      <text class="muted" wx:if="{{isRecognizing}}">后台处理中，你可以继续填写位置和备注。</text>
+      <text class="muted" wx:if="{{isRecognizing}}">识别中，请稍候...</text>
       <text class="muted" wx:if="{{aiScore}}">置信度：{{aiScore}}</text>
       <text class="muted" wx:if="{{aiSummary}}">{{aiSummary}}</text>
       <view class="collapse-body {{candidatesCollapsed ? 'hidden' : ''}}">

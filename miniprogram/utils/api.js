@@ -187,11 +187,10 @@ function login(username, password) {
 function ensureReviewerLogin() {
   var token = getToken();
   if (token) {
-    // Already have a token, verify it's still valid by checking role
     return Promise.resolve();
   }
-  // Auto-login with demo reviewer account
-  return login("reviewer", "review123");
+  // No token — redirect to login page
+  return Promise.reject(new Error("请先登录审核员账号"));
 }
 
 function startRecognition(fileId) {
@@ -340,6 +339,48 @@ function getPurchases(userId) {
   return request("/api/shop/purchases/" + userId);
 }
 
+// --- User Profile ---
+
+function getUserProfile(userId) {
+  return request("/api/user/profile/" + userId);
+}
+
+function updateAvatar(userId, avatarUrl) {
+  return request("/api/user/avatar", {
+    method: "POST",
+    data: { avatarUrl: avatarUrl }
+  });
+}
+
+function uploadAvatar(filePath) {
+  return new Promise(function (resolve, reject) {
+    wx.uploadFile({
+      url: (app.globalData.apiBaseUrl || "") + "/api/uploads",
+      filePath: filePath,
+      name: "image",
+      success: function (res) {
+        try {
+          var data = JSON.parse(res.data);
+          if (res.statusCode >= 200 && res.statusCode < 300) {
+            resolve(data);
+            return;
+          }
+          var msg = (data && (data.error || data.message)) || "HTTP " + res.statusCode;
+          wx.showToast({ title: msg, icon: "none" });
+          reject(new Error(msg));
+        } catch (error) {
+          wx.showToast({ title: "上传解析失败", icon: "none" });
+          reject(error);
+        }
+      },
+      fail: function (err) {
+        wx.showToast({ title: "上传请求失败", icon: "none" });
+        reject(err);
+      }
+    });
+  });
+}
+
 // --- Achievements ---
 
 function getAchievements() {
@@ -373,22 +414,22 @@ function exportCsv() {
   var baseUrl = app.globalData.apiBaseUrl || "";
   var token = getToken();
   var url = baseUrl + "/api/reports/export/csv";
-  // Token is sent via Authorization header only (not in URL query to avoid log leakage)
   return new Promise(function (resolve, reject) {
     wx.downloadFile({
       url: url,
       header: token ? { Authorization: "Bearer " + token } : {},
       success: function (res) {
         if (res.statusCode === 200) {
-          wx.saveFile({
-            tempFilePath: res.tempFilePath,
-            success: function (saveRes) {
+          wx.openDocument({
+            filePath: res.tempFilePath,
+            fileType: "csv",
+            showMenu: true,
+            success: function () {
               wx.showToast({ title: "导出成功", icon: "success" });
-              resolve(saveRes.savedFilePath);
+              resolve(res.tempFilePath);
             },
             fail: function () {
-              // If save fails, still consider download a success
-              wx.showToast({ title: "下载完成", icon: "success" });
+              wx.showToast({ title: "下载完成，请通过分享转发文件", icon: "none", duration: 3000 });
               resolve(res.tempFilePath);
             }
           });
@@ -439,5 +480,8 @@ module.exports = {
   checkAchievements: checkAchievements,
   getLeaderboard: getLeaderboard,
   getPrivileges: getPrivileges,
-  getOrders: getOrders
+  getOrders: getOrders,
+  getUserProfile: getUserProfile,
+  updateAvatar: updateAvatar,
+  uploadAvatar: uploadAvatar
 };
