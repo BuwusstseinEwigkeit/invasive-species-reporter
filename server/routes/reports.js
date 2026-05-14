@@ -1,5 +1,4 @@
 const { Router } = require("express");
-const jwt = require("jsonwebtoken");
 const fs = require("fs");
 const crypto = require("crypto");
 const { authRequired, reviewerRequired } = require("../middleware/auth");
@@ -12,7 +11,6 @@ const {
   checkReportLimit,
   checkImageDuplicate,
   addImageFingerprint,
-  checkGeotemporalDuplicate,
   addPoints,
   updateUserCredit,
   createNotification,
@@ -22,7 +20,7 @@ const { getUpload } = require("../lib/upload-store");
 const { sendError } = require("../lib/helpers");
 
 const router = Router();
-const JWT_SECRET = process.env.JWT_SECRET;
+const REVIEW_ACTIONS = new Set(["approved", "rejected", "spam"]);
 
 // GET /api/reports
 router.get("/", (req, res) => {
@@ -92,14 +90,18 @@ router.post("/", authRequired, (req, res) => {
     }
 
     const { fileId, latitude, longitude } = req.body || {};
+    let imageFingerprint = "";
 
     if (fileId) {
       const uploadRecord = getUpload(fileId);
       if (uploadRecord) {
         let md5Hash = "";
+        let fileSize = 0;
         try {
-          const fileBuffer = fs.readFileSync(uploadRecord.path);
+          const filePath = uploadRecord.filePath;
+          const fileBuffer = fs.readFileSync(filePath);
           md5Hash = crypto.createHash("md5").update(fileBuffer).digest("hex");
+          fileSize = fs.statSync(filePath).size;
         } catch (_e) { /* ignore */ }
 
         if (md5Hash && checkImageDuplicate(md5Hash)) {
@@ -107,14 +109,10 @@ router.post("/", authRequired, (req, res) => {
           return;
         }
         if (md5Hash) {
-          addImageFingerprint(md5Hash, userId, uploadRecord.size, 0, 0);
+          imageFingerprint = md5Hash;
+          addImageFingerprint(md5Hash, userId, fileSize, 0, 0);
         }
       }
-    }
-
-    let isDupe = false;
-    if (latitude && longitude) {
-      isDupe = checkGeotemporalDuplicate(userId, latitude, longitude);
     }
 
     const reportPayload = {
@@ -128,10 +126,11 @@ router.post("/", authRequired, (req, res) => {
       longitude,
       address: req.body.address,
       remark: req.body.remark,
-      imageFingerprint: "",
+      imageFingerprint,
     };
 
     const result = createReportWithPoints(reportPayload);
+    const isDupe = result.isDupe;
 
     if (!isDupe) {
       try {
@@ -157,6 +156,11 @@ router.post("/", authRequired, (req, res) => {
 // POST /api/reports/:id/review
 router.post("/:id/review", authRequired, reviewerRequired, (req, res) => {
   try {
+    if (!REVIEW_ACTIONS.has(req.body && req.body.action)) {
+      sendError(res, "action must be approved/rejected/spam", 400);
+      return;
+    }
+
     const payload = {
       ...req.body,
       reviewerId: req.user.userId,

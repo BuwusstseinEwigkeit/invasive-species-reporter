@@ -123,9 +123,11 @@ Page({
 
   async directPurchase(productId) {
     var self = this;
+    var product = this.data.products.find(function(p) { return p.id === productId; });
+    if (!product) return;
     wx.showModal({
       title: "确认兑换",
-      content: "确定要兑换「" + (self.data.shippingProduct || {name:""}).name + "」吗？将消耗 " + (self.data.shippingProduct || {pointsCost:0}).pointsCost + " 积分。",
+      content: "确定要兑换「" + product.name + "」吗？将消耗 " + product.pointsCost + " 积分。",
       success: async function(res) {
         if (!res.confirm) return;
         self.setData({ buying: true });
@@ -161,7 +163,7 @@ Page({
         if (!res.confirm) return;
         self.setData({ buying: true });
         try {
-          var result = await api.purchaseProduct(product.id);
+          var result = await api.purchaseProduct(product.id, form);
           wx.showToast({ title: "兑换成功", icon: "success" });
           self.setData({
             points: result.item.newTotal || 0,

@@ -8,7 +8,7 @@ const JWT_SECRET = process.env.JWT_SECRET;
 
 // POST /api/auth/register
 router.post("/register", (req, res) => {
-  const { username, password, role } = req.body || {};
+  const { username, password } = req.body || {};
 
   if (!username || !password) {
     sendError(res, "Username and password are required.", 400);
@@ -20,8 +20,7 @@ router.post("/register", (req, res) => {
     return;
   }
 
-  const userRole = role === "reviewer" ? "user" : (role || "user");
-  const user = db.createUser(username, password, userRole);
+  const user = db.createUser(username, password, "user");
 
   if (!user) {
     sendError(res, "Username already taken.", 409);

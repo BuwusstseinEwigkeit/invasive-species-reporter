@@ -328,10 +328,16 @@ function getProducts() {
   return request("/api/shop/products");
 }
 
-function purchaseProduct(productId) {
+function purchaseProduct(productId, shippingInfo) {
+  shippingInfo = shippingInfo || {};
   return request("/api/shop/purchase", {
     method: "POST",
-    data: { productId: productId }
+    data: {
+      productId: productId,
+      shippingName: shippingInfo.name || shippingInfo.shippingName || "",
+      shippingPhone: shippingInfo.phone || shippingInfo.shippingPhone || "",
+      shippingAddress: shippingInfo.address || shippingInfo.shippingAddress || ""
+    }
   });
 }
 

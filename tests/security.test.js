@@ -14,6 +14,8 @@ process.env.REVIEWER_PASS = "review123";
 process.env.DEMO_PASS = "demo123";
 
 const request = require("supertest");
+const fs = require("fs");
+const path = require("path");
 
 beforeAll(() => {
   const db = require("../server/lib/database");
@@ -27,12 +29,19 @@ let otherUserToken;
 let adminToken;
 let userId;
 let otherUserId;
+const uploadedFiles = [];
 
 beforeAll(() => {
   app = require("../server/index");
 });
 
 afterAll(() => {
+  for (const fileId of uploadedFiles) {
+    const filePath = path.join(__dirname, "..", "server", "uploads", fileId);
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+  }
   const db = require("../server/lib/database");
   db._reset && db._reset();
 });
@@ -70,6 +79,14 @@ describe("Authentication: unauthenticated requests are rejected", () => {
 });
 
 describe("Setup: create test users", () => {
+  test("Registration ignores requested privileged role", async () => {
+    const res = await request(app)
+      .post("/api/auth/register")
+      .send({ username: "notadmin", password: "pass123456", role: "admin" });
+    expect(res.status).toBe(201);
+    expect(res.body.item.role).toBe("user");
+  });
+
   test("Register first user", async () => {
     const res = await request(app)
       .post("/api/auth/register")
@@ -98,6 +115,18 @@ describe("Setup: create test users", () => {
 });
 
 describe("Permission: cross-user point manipulation is blocked", () => {
+  test("GET /api/points/:userId without auth returns 401", async () => {
+    const res = await request(app).get(`/api/points/${userId}`);
+    expect(res.status).toBe(401);
+  });
+
+  test("GET /api/points/:userId with wrong user returns 403", async () => {
+    const res = await request(app)
+      .get(`/api/points/${otherUserId}`)
+      .set("Authorization", `Bearer ${userToken}`);
+    expect(res.status).toBe(403);
+  });
+
   test("POST /api/points/:userId with wrong user returns 403", async () => {
     const res = await request(app)
       .post(`/api/points/${otherUserId}`)
@@ -107,12 +136,13 @@ describe("Permission: cross-user point manipulation is blocked", () => {
     expect(res.body.error).toContain("Access denied");
   });
 
-  test("POST /api/points/:userId with own user succeeds", async () => {
+  test("POST /api/points/:userId with own user is rejected", async () => {
     const res = await request(app)
       .post(`/api/points/${userId}`)
       .set("Authorization", `Bearer ${userToken}`)
       .send({ amount: 5, action: "test_reward" });
-    expect(res.status).toBe(201);
+    expect(res.status).toBe(403);
+    expect(res.body.error).toContain("Point balances");
   });
 });
 
@@ -185,6 +215,70 @@ describe("Permission: review requires reviewer role", () => {
       .send({ action: "approved" });
     expect(res.status).toBe(200);
     expect(res.body.item.status).toBe("approved");
+  });
+
+  test("Admin cannot write invalid review action", async () => {
+    const createRes = await request(app)
+      .post("/api/reports")
+      .set("Authorization", `Bearer ${userToken}`)
+      .send({
+        aiTop1: "非法状态测试",
+        latitude: 31.97,
+        longitude: 118.92,
+      });
+    expect(createRes.status).toBe(201);
+
+    const res = await request(app)
+      .post(`/api/reports/${createRes.body.item.id}/review`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ action: "approved;drop" });
+    expect(res.status).toBe(400);
+
+    const listRes = await request(app)
+      .get("/api/reports/my")
+      .set("Authorization", `Bearer ${userToken}`);
+    const report = listRes.body.items.find((item) => item.id === createRes.body.item.id);
+    expect(report.status).toBe("pending");
+  });
+});
+
+describe("Anti-spam: uploaded image duplicate is blocked", () => {
+  test("Submitting the same uploaded image twice returns 400", async () => {
+    const imageBuffer = Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aN6kAAAAASUVORK5CYII=",
+      "base64"
+    );
+    const uploadRes = await request(app)
+      .post("/api/uploads")
+      .attach("image", imageBuffer, "tiny.png");
+    expect(uploadRes.status).toBe(201);
+    const fileId = uploadRes.body.item.fileId;
+    uploadedFiles.push(fileId);
+
+    const first = await request(app)
+      .post("/api/reports")
+      .set("Authorization", `Bearer ${otherUserToken}`)
+      .send({
+        fileId,
+        imageUrl: uploadRes.body.item.imageUrl,
+        aiTop1: "重复图测试",
+        latitude: 32.31,
+        longitude: 119.15,
+      });
+    expect(first.status).toBe(201);
+
+    const second = await request(app)
+      .post("/api/reports")
+      .set("Authorization", `Bearer ${otherUserToken}`)
+      .send({
+        fileId,
+        imageUrl: uploadRes.body.item.imageUrl,
+        aiTop1: "重复图测试",
+        latitude: 32.91,
+        longitude: 119.75,
+      });
+    expect(second.status).toBe(400);
+    expect(second.body.error).toContain("图片重复");
   });
 });
 

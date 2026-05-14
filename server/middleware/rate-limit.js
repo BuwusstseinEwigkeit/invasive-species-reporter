@@ -40,7 +40,7 @@ function rateLimiter(req, res, next) {
 }
 
 // Clean up expired entries periodically
-setInterval(() => {
+const cleanupTimer = setInterval(() => {
   const now = Date.now();
   for (const [key, record] of rateLimitStore.entries()) {
     if (now - record.windowStart > rateLimitWindowMs * 2) {
@@ -48,5 +48,6 @@ setInterval(() => {
     }
   }
 }, rateLimitWindowMs);
+if (cleanupTimer.unref) cleanupTimer.unref();
 
 module.exports = { rateLimiter, rateLimitStore };

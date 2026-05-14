@@ -27,7 +27,7 @@ function removeUpload(fileId) {
 }
 
 // Periodic cleanup of expired uploads
-setInterval(() => {
+const cleanupTimer = setInterval(() => {
   const now = Date.now();
   for (const [key, entry] of uploadIndex) {
     if (now - entry.createdAt > UPLOAD_TTL_MS) {
@@ -35,6 +35,7 @@ setInterval(() => {
     }
   }
 }, 10 * 60 * 1000); // every 10 minutes
+if (cleanupTimer.unref) cleanupTimer.unref();
 
 module.exports = {
   registerUpload,

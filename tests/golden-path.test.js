@@ -129,10 +129,12 @@ describe("Golden Path: Register → Report → Review", () => {
   });
 
   test("10. User earned points from approval", async () => {
-    const res = await request(app).get(`/api/points/${testUserId}`);
+    const res = await request(app)
+      .get(`/api/points/${testUserId}`)
+      .set("Authorization", `Bearer ${userToken}`);
     expect(res.status).toBe(200);
-    // +5 for submission, +20 for approval, +20 for first report bonus = 45 total
-    expect(res.body.item.total).toBeGreaterThanOrEqual(25);
+    // +5 for submission, +20 for first report bonus, +20 for approval = 45 total
+    expect(res.body.item.total).toBe(45);
   });
 
   test("11. Achievements endpoint is accessible", async () => {

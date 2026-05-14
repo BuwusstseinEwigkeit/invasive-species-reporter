@@ -2,7 +2,6 @@ const { Router } = require("express");
 const { authRequired } = require("../middleware/auth");
 const {
   getPoints,
-  addPoints,
   getNotifications,
   getUnreadNotificationCount,
   markNotificationRead,
@@ -19,7 +18,11 @@ const { sendError } = require("../lib/helpers");
 const router = Router();
 
 // GET /api/points/:userId
-router.get("/points/:userId", (req, res) => {
+router.get("/points/:userId", authRequired, (req, res) => {
+  if (req.user.userId !== req.params.userId) {
+    sendError(res, "Access denied.", 403);
+    return;
+  }
   const result = getPoints(req.params.userId);
   res.json({ item: result });
 });
@@ -30,13 +33,7 @@ router.post("/points/:userId", authRequired, (req, res) => {
     sendError(res, "Access denied.", 403);
     return;
   }
-  const { amount, action, referenceId } = req.body || {};
-  if (!amount || !action) {
-    sendError(res, "Amount and action are required.", 400);
-    return;
-  }
-  const result = addPoints(req.params.userId, amount, action, referenceId);
-  res.status(201).json({ item: result });
+  sendError(res, "Point balances are managed by system events.", 403);
 });
 
 // GET /api/notifications/:userId

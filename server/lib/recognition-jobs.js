@@ -85,7 +85,7 @@ function getRecognitionJob(jobId) {
 }
 
 // Periodic cleanup of expired jobs
-setInterval(() => {
+const cleanupTimer = setInterval(() => {
   const now = Date.now();
   for (const [key, job] of recognitionJobs) {
     if (now - job.createdAt > JOB_TTL_MS) {
@@ -93,6 +93,7 @@ setInterval(() => {
     }
   }
 }, 10 * 60 * 1000); // every 10 minutes
+if (cleanupTimer.unref) cleanupTimer.unref();
 
 module.exports = {
   createRecognitionJob,

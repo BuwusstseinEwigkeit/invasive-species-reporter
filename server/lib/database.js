@@ -999,22 +999,19 @@ function createReportWithPoints(payload) {
   const userId = payload.userId || "user-anonymous";
   const pointsDelta = [];
 
-  // Always award +5 for submission
-  addPoints(userId, 5, "report_submit", id);
-  pointsDelta.push({ action: "report_submit", amount: 5 });
+  if (!isDupe) {
+    addPoints(userId, 5, "report_submit", id);
+    pointsDelta.push({ action: "report_submit", amount: 5 });
 
-  // First report bonus
-  if (isFirstReport) {
-    addPoints(userId, 20, "first_report", id);
-    pointsDelta.push({ action: "first_report", amount: 20 });
-  }
-
-  // Check streak bonus (3 consecutive days)
-  if (!isFirstReport) {
-    const streak = checkStreakBonus(userId);
-    if (streak) {
-      addPoints(userId, 10, "streak_bonus", id);
-      pointsDelta.push({ action: "streak_bonus", amount: 10 });
+    if (isFirstReport) {
+      addPoints(userId, 20, "first_report", id);
+      pointsDelta.push({ action: "first_report", amount: 20 });
+    } else {
+      const streak = checkStreakBonus(userId);
+      if (streak) {
+        addPoints(userId, 10, "streak_bonus", id);
+        pointsDelta.push({ action: "streak_bonus", amount: 10 });
+      }
     }
   }
 
@@ -1099,6 +1096,18 @@ function createPurchaseFull(userId, productId, shippingInfo) {
   const product = d.prepare("SELECT * FROM products WHERE id = ?").get(productId);
   if (!product) return { error: "Product not found" };
   if (product.stock <= 0) return { error: "Out of stock" };
+
+  if (product.is_virtual === 0) {
+    const sanitizedShipping = {
+      name: shippingInfo && (shippingInfo.name || shippingInfo.shippingName),
+      phone: shippingInfo && (shippingInfo.phone || shippingInfo.shippingPhone),
+      address: shippingInfo && (shippingInfo.address || shippingInfo.shippingAddress)
+    };
+    if (!sanitizedShipping.name || !sanitizedShipping.phone || !sanitizedShipping.address) {
+      return { error: "Shipping info required" };
+    }
+    shippingInfo = sanitizedShipping;
+  }
 
   // Check requirement
   if (product.requirement) {

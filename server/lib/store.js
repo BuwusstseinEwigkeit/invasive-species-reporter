@@ -148,10 +148,6 @@ function addImageFingerprint(md5Hash, userId, fileSize, width, height) {
   db.addImageFingerprint(md5Hash, userId, fileSize, width, height);
 }
 
-function checkGeotemporalDuplicate(userId, latitude, longitude) {
-  return db.checkGeotemporalDuplicate(userId, latitude, longitude);
-}
-
 function createReportWithPoints(payload) {
   return db.createReportWithPoints(payload);
 }
@@ -218,7 +214,6 @@ module.exports = {
   checkReportLimit,
   checkImageDuplicate,
   addImageFingerprint,
-  checkGeotemporalDuplicate,
   createReportWithPoints,
   getProductCategories,
   getUserPrivileges,
