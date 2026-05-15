@@ -92,19 +92,9 @@ function getPoints(userId) {
   return db.getPoints(userId);
 }
 
-function addPoints(userId, amount, action, refId) {
-  ensureInitialized();
-  return db.addPoints(userId, amount, action, refId);
-}
-
 function getProducts() {
   ensureInitialized();
   return db.getProducts();
-}
-
-function createPurchase(userId, productId) {
-  ensureInitialized();
-  return db.createPurchase(userId, productId);
 }
 
 function getUserPurchases(userId) {
@@ -200,9 +190,7 @@ module.exports = {
   markAllNotificationsRead,
   getStats,
   getPoints,
-  addPoints,
   getProducts,
-  createPurchase,
   getUserPurchases,
   getAchievementStats,
   getUserAchievements,

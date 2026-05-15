@@ -1,22 +1,16 @@
 const { Router } = require("express");
-const fs = require("fs");
-const crypto = require("crypto");
 const { authRequired, reviewerRequired } = require("../middleware/auth");
 const {
   getReports,
   getReportsByUser,
   getApprovedReportsForExport,
-  createReportWithPoints,
   reviewReport,
-  checkReportLimit,
-  checkImageDuplicate,
-  addImageFingerprint,
-  addPoints,
   updateUserCredit,
   createNotification,
   checkAndAwardAchievements,
 } = require("../lib/store");
-const { getUpload } = require("../lib/upload-store");
+const pointsLedger = require("../lib/points-ledger");
+const { createUserReport } = require("../lib/report-submission");
 const { sendError } = require("../lib/helpers");
 
 const router = Router();
@@ -82,74 +76,22 @@ router.get("/export/csv", authRequired, (_req, res) => {
 router.post("/", authRequired, (req, res) => {
   try {
     const userId = req.user.userId;
-
-    const limit = checkReportLimit(userId);
-    if (!limit.allowed) {
-      sendError(res, `今日上报已达上限（每日${limit.dailyLimit}次），信用分过低请保持良好记录。`, 429);
-      return;
-    }
-
-    const { fileId, latitude, longitude } = req.body || {};
-    let imageFingerprint = "";
-
-    if (fileId) {
-      const uploadRecord = getUpload(fileId);
-      if (uploadRecord) {
-        let md5Hash = "";
-        let fileSize = 0;
-        try {
-          const filePath = uploadRecord.filePath;
-          const fileBuffer = fs.readFileSync(filePath);
-          md5Hash = crypto.createHash("md5").update(fileBuffer).digest("hex");
-          fileSize = fs.statSync(filePath).size;
-        } catch (_e) { /* ignore */ }
-
-        if (md5Hash && checkImageDuplicate(md5Hash)) {
-          sendError(res, "图片重复，请勿重复上传相同图片。", 400);
-          return;
-        }
-        if (md5Hash) {
-          imageFingerprint = md5Hash;
-          addImageFingerprint(md5Hash, userId, fileSize, 0, 0);
-        }
-      }
-    }
-
-    const reportPayload = {
-      userId,
-      speciesId: req.body.speciesId,
-      aiTop1: req.body.aiTop1,
-      aiScore: req.body.aiScore,
-      aiCandidates: req.body.aiCandidates,
-      imageUrl: req.body.imageUrl,
-      latitude,
-      longitude,
-      address: req.body.address,
-      remark: req.body.remark,
-      imageFingerprint,
-    };
-
-    const result = createReportWithPoints(reportPayload);
+    const result = createUserReport(userId, req.body || {});
     const isDupe = result.isDupe;
-
-    if (!isDupe) {
-      try {
-        const newlyEarned = checkAndAwardAchievements(userId);
-        if (newlyEarned.length > 0) {
-          createNotification(userId, "🏆 获得新成就", `恭喜获得「${newlyEarned[0].name}」成就！`, "achievement", null);
-        }
-      } catch (_e) { /* optional */ }
-    }
 
     res.status(201).json({
       item: result.report,
       message: isDupe
         ? "上报已创建（重复位置，不发放积分）。"
         : "上报已创建，等待审核。",
-      pointsDelta: isDupe ? [] : result.pointsDelta,
+      pointsDelta: result.pointsDelta,
     });
   } catch (error) {
-    sendError(res, "Invalid JSON body", 400);
+    if (error.statusCode) {
+      sendError(res, error.message, error.statusCode);
+    } else {
+      sendError(res, "Invalid request", 400);
+    }
   }
 });
 
@@ -177,10 +119,10 @@ router.post("/:id/review", authRequired, reviewerRequired, (req, res) => {
       const report = result.report;
       if (report && report.userId && report.userId !== "user-anonymous") {
         try {
-          addPoints(report.userId, 20, "report_approved", report.id);
+          pointsLedger.awardReportApproved(report.userId, report.id);
           const isHighQuality = report.aiScore > 0.95 || payload.highQuality;
           if (isHighQuality) {
-            addPoints(report.userId, 10, "high_quality", report.id);
+            pointsLedger.awardHighQualityReport(report.userId, report.id);
           }
           updateUserCredit(report.userId, 2);
           createNotification(
@@ -209,7 +151,7 @@ router.post("/:id/review", authRequired, reviewerRequired, (req, res) => {
       const report = result.report;
       if (report && report.userId && report.userId !== "user-anonymous") {
         try {
-          addPoints(report.userId, -10, "report_spam", report.id);
+          pointsLedger.penalizeSpamReport(report.userId, report.id);
           updateUserCredit(report.userId, -10);
           createNotification(report.userId, "⚠️ 上报被标记为无效", `您的上报「${report.aiTop1}」被判定为垃圾上报，积分-10，信用分-10。`, "rejected", report.id);
         } catch (_e) { /* optional */ }

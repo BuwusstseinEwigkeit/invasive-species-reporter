@@ -266,6 +266,9 @@ function testPurchaseVirtualNoShipping() {
   const result = db.createPurchaseFull(user.id, "product-avatar-frame", null);
   assertTrue(!result.error, "virtual purchase should succeed without shipping: " + (result.error || ""));
   assertEqual(result.newTotal, 920, "points deducted");
+  const purchaseLog = db.getPoints(user.id).logs.find((log) => log.action === "purchase");
+  assertTrue(!!purchaseLog, "purchase should write a points ledger entry");
+  assertEqual(purchaseLog.amount, -80, "purchase ledger amount");
 }
 
 function testPurchaseInsufficientPoints() {

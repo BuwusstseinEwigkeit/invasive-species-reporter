@@ -702,42 +702,6 @@ function seedProducts(products) {
   seedMany(products);
 }
 
-function createPurchase(userId, productId) {
-  const d = getDb();
-  const product = d.prepare("SELECT * FROM products WHERE id = ?").get(productId);
-  if (!product) return { error: "Product not found" };
-  if (product.stock <= 0) return { error: "Out of stock" };
-
-  const purchaseId = `purchase-${Date.now()}-${crypto.randomBytes(4).toString("hex")}`;
-
-  // Use transaction to prevent race conditions on points deduction
-  const result = d.transaction(() => {
-    const pointsRow = d.prepare("SELECT * FROM points WHERE user_id = ?").get(userId);
-    const currentTotal = pointsRow ? pointsRow.total : 0;
-    if (currentTotal < product.points_cost) {
-      return { error: "Insufficient points" };
-    }
-
-    d.prepare("UPDATE points SET total = total - ?, updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE user_id = ?").run(product.points_cost, userId);
-    d.prepare("INSERT INTO purchases (id, user_id, product_id) VALUES (?, ?, ?)").run(purchaseId, userId, productId);
-    d.prepare("UPDATE products SET stock = stock - 1 WHERE id = ?").run(productId);
-    return null;
-  })();
-
-  if (result && result.error) return result;
-
-  const newTotal = d.prepare("SELECT total FROM points WHERE user_id = ?").get(userId).total;
-  return {
-    purchase: {
-      id: purchaseId,
-      userId,
-      productId,
-      createdAt: new Date().toISOString()
-    },
-    newTotal
-  };
-}
-
 function getUserPurchases(userId) {
   return getDb().prepare("SELECT * FROM purchases WHERE user_id = ? ORDER BY created_at DESC").all(userId).map(rowToPurchase);
 }
@@ -1000,17 +964,15 @@ function createReportWithPoints(payload) {
   const pointsDelta = [];
 
   if (!isDupe) {
-    addPoints(userId, 5, "report_submit", id);
-    pointsDelta.push({ action: "report_submit", amount: 5 });
+    const pointsLedger = require("./points-ledger");
+    pointsDelta.push(pointsLedger.awardReportSubmitted(userId, id));
 
     if (isFirstReport) {
-      addPoints(userId, 20, "first_report", id);
-      pointsDelta.push({ action: "first_report", amount: 20 });
+      pointsDelta.push(pointsLedger.awardFirstReport(userId, id));
     } else {
       const streak = checkStreakBonus(userId);
       if (streak) {
-        addPoints(userId, 10, "streak_bonus", id);
-        pointsDelta.push({ action: "streak_bonus", amount: 10 });
+        pointsDelta.push(pointsLedger.awardStreakBonus(userId, id));
       }
     }
   }
@@ -1135,6 +1097,7 @@ function createPurchaseFull(userId, productId, shippingInfo) {
 
     // Record purchase
     d.prepare("INSERT INTO purchases (id, user_id, product_id) VALUES (?, ?, ?)").run(purchaseId, userId, productId);
+    require("./points-ledger").recordPurchaseInTransaction(d, userId, purchaseId, product.points_cost);
 
     // If physical product, create order
     let order = null;
@@ -1312,7 +1275,6 @@ module.exports = {
   addPoints,
   getProducts,
   seedProducts: seedProductsFull,
-  createPurchase,
   getUserPurchases,
   getAchievementStats,
   getUserAchievements,
