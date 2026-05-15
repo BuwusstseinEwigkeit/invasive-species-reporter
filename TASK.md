@@ -96,7 +96,7 @@
 - [ ] **7.1 database.js 拆分** — 将 1300+ 行的 God Object 拆分为 db-schema.js / db-reports.js / db-users.js / db-shop.js
 - [ ] **7.2 store.js 重构** — 消除纯透传层，将 ensureInitialized 逻辑移入 database.js 懒初始化
 - [ ] **7.3 积分系统整理** — 审查 points 表 vs user_credit 表的职责边界，消除冗余
-- [ ] **7.4 测试覆盖扩充** — 补充路由层单元测试（商城、通知、排行榜）
+- [ ] **7.4 测试覆盖扩充** — 补充路由层单元测试（商城、通知、排行榜）+ 新模块专属单测（`tests/points-ledger.test.js` 覆盖 award/purchase 两条路径、`tests/report-submission.test.js` 覆盖限流/重复图片/降级路径）
 
 ## Phase 8: 运维就绪 (P2) — 待开始
 

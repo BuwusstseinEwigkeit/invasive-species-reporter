@@ -45,6 +45,78 @@
 - Do not remove async job flow; front-end already depends on it.
 - Database schema is in `server/lib/database.js` → `initSchema()`
 
+## 代码审查 [2026-05-15] — v0.7.1 重构（待 commit）
+
+> Claude Code 审查 → 待 Codex 复核 → 决定修复方案
+
+### 待审查改动（未 commit）
+
+| 类型 | 文件 | 增减 |
+|------|------|------|
+| 新增 | `server/lib/point-events.js` | +11 |
+| 新增 | `server/lib/points-ledger.js` | +69 |
+| 新增 | `server/lib/report-submission.js` | +86 |
+| 修改 | `server/lib/database.js` | -42 |
+| 修改 | `server/lib/store.js` | -13 |
+| 修改 | `server/routes/reports.js` | -60 |
+| 修改 | `tests/anti-spam.test.js` | +3 |
+
+净减 144 行业务代码 → 抽出 166 行新模块。重构思路：积分写入常量化 + 路由瘦身。
+
+### 测试状态
+
+- `tests/anti-spam.test.js`：26/26 ✅（含新购买账本断言 line 266-269）
+- `tests/security.test.js`：27/27 ✅（npx jest）
+
+### 审查发现（按优先级）
+
+**🟡 Important**
+
+1. **隐藏行为变更**（`server/lib/database.js:1100`）— 旧 `createPurchaseFull` 只更新 `points` 余额、不写 `points_log`；新版通过 `recordPurchaseInTransaction` 补齐购买流水。`getPoints().logs` 会多出 `action="purchase"` 的负值条目。
+   - **待 Codex 确认**：这是否有意修复？需在 commit message 里说明这是行为变更，前端是否需要兼容 `purchase` 类型？
+
+2. **ID 风格不一致**（`server/lib/points-ledger.js:22-23`）
+   ```js
+   `points-${Date.now()}-${crypto.randomBytes(4).toString("hex")}`
+   ```
+   v0.7.0 已统一其他 ID 改用 `crypto.randomUUID()`（参考 `database.js:935` `report-${crypto.randomUUID()}`）。建议统一为 `points-${crypto.randomUUID()}`。
+
+3. **错误信息脱敏回退**（`server/routes/reports.js:90`）
+   ```js
+   sendError(res, error.message || "Invalid JSON body", error.statusCode || 400);
+   ```
+   `report-submission.js` 内 `fs.readFileSync` / `crypto.createHash` 抛非业务错误时，会通过 `error.message` 暴露内部信息。v0.7.0 错误脱敏的工作被新增的兜底回退抵消了。建议：
+   ```js
+   if (error.statusCode) sendError(res, error.message, error.statusCode);
+   else sendError(res, "Invalid request", 400);
+   ```
+
+4. **store.js 反方向重构**（`server/lib/store.js:91-94`）— `.claude/CLAUDE.md` 已知技术债 #15 目标是"消除 store.js 纯透传层"，但本次新增 `getPoints → pointsLedger.getPoints → db.getPoints` 反而多了一层。建议 store.js `getPoints` 直接调 `db.getPoints` 即可。
+
+**🔵 Suggestion**
+
+5. **静默吞 fs 错误**（`server/lib/report-submission.js:21-28`）— 上传文件读取失败直接返回空指纹、绕过 MD5 去重。功能等价旧逻辑，但抽出独立函数后建议补注释说明"读取失败时跳过去重"。
+
+6. **购买事务双路径需注释**（`server/lib/points-ledger.js:31-33`）— `recordPurchaseInTransaction` 只写 log（不更新余额，调用方在事务里已 UPDATE）；`writeEvent` 通过 `db.addPoints` 同时更新余额+log。两条路径正确但易踩坑，建议在 `recordPurchaseInTransaction` 上加注释。
+
+7. **新模块缺专属单测** — `point-events` / `points-ledger` / `report-submission` 只通过 reports route 间接覆盖。建议补 `tests/points-ledger.test.js`（可合并 Phase 7.4 一并做）。
+
+### Codex 重点看
+
+- `server/lib/database.js:1100` — 购买事务里新增 ledger 写入，是否引入双重扣分？测试已证否，但事务/非事务双路径需要 review 二次确认。
+- `server/lib/database.js:967` — 懒 require 规避循环依赖（database → ledger → database），是否可接受？
+- 三个新模块的职责切分是否合理？尤其 `report-submission.js` 是否应该放在 `routes/` 而不是 `lib/`？
+
+### 处理建议
+
+- #3（错误脱敏）有潜在安全影响，建议直接修。
+- #2、#4 一行小改，无副作用，可一并修。
+- #1 需要 commit message 显式说明，建议保留行为变更但加文档。
+- #5、#6 注释级，可作为 commit 同包带上。
+- #7 单独建 issue 进 Phase 7.4。
+
+---
+
 ## Completed (v0.7.0 — 安全修复 + UX 优化 + 工程改进)
 
 ### 安全修复
