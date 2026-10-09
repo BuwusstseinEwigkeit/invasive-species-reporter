@@ -10,17 +10,18 @@ const JWT_SECRET = process.env.JWT_SECRET;
 router.post("/register", (req, res) => {
   const { username, password } = req.body || {};
 
-  if (!username || !password) {
+  if (typeof username !== "string" || typeof password !== "string") {
     sendError(res, "Username and password are required.", 400);
     return;
   }
 
-  if (username.length < 3 || password.length < 8) {
-    sendError(res, "Username must be at least 3 chars, password at least 8 chars.", 400);
+  const normalizedUsername = username.trim();
+  if (normalizedUsername.length < 3 || normalizedUsername.length > 32 || password.length < 8 || password.length > 128) {
+    sendError(res, "Username must be 3-32 chars, password 8-128 chars.", 400);
     return;
   }
 
-  const user = db.createUser(username, password, "user");
+  const user = db.createUser(normalizedUsername, password, "user");
 
   if (!user) {
     sendError(res, "Username already taken.", 409);
@@ -47,12 +48,12 @@ router.post("/register", (req, res) => {
 router.post("/login", (req, res) => {
   const { username, password } = req.body || {};
 
-  if (!username || !password) {
+  if (typeof username !== "string" || typeof password !== "string" || !username.trim() || !password) {
     sendError(res, "Username and password are required.", 400);
     return;
   }
 
-  const user = db.authenticateUser(username, password);
+  const user = db.authenticateUser(username.trim(), password);
 
   if (!user) {
     sendError(res, "Invalid username or password.", 401);
@@ -92,7 +93,7 @@ router.post("/wx-login", async (req, res) => {
   if (appid && secret) {
     try {
       const https = require("https");
-      const url = `https://api.weixin.qq.com/sns/jscode2session?appid=${appid}&secret=${secret}&js_code=${code}&grant_type=authorization_code`;
+      const url = `https://api.weixin.qq.com/sns/jscode2session?appid=${encodeURIComponent(appid)}&secret=${encodeURIComponent(secret)}&js_code=${encodeURIComponent(code)}&grant_type=authorization_code`;
       const result = await new Promise((resolve, reject) => {
         https.get(url, (resp) => {
           let data = "";
@@ -115,15 +116,17 @@ router.post("/wx-login", async (req, res) => {
       sendError(res, "微信登录服务暂不可用", 502);
       return;
     }
-  } else {
+  } else if (process.env.NODE_ENV !== "production" && String(process.env.ENABLE_DEV_WX_LOGIN || "").toLowerCase() === "true") {
     console.log("[wx-login] Dev mode: WECHAT_APPID not set, using code as openid");
     openid = `dev-${code}`;
+  } else {
+    sendError(res, "微信登录尚未配置。", 503);
+    return;
   }
 
   let user = db.getUserByOpenId(openid);
   if (!user) {
     user = db.createUserFromOpenId(openid);
-    console.log(`[wx-login] Created new user for openid=${openid}, id=${user.id}`);
   }
 
   const token = jwt.sign(

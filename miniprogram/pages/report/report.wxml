@@ -3,7 +3,7 @@
   <view class="success-overlay" wx:if="{{submitSuccess}}">
     <image class="success-img" src="/images/report-success.png" mode="aspectFit" />
     <text class="success-title">提交成功</text>
-    <text class="success-desc">感谢您的生态线索，审核员将在24小时内完成审核。</text>
+    <text class="success-desc">线索已进入审核队列。有效上报将在审核通过后结算积分，重复线索不重复奖励。</text>
     <button class="primary-button success-btn" hover-class="hover-scale" bindtap="goHome">返回首页</button>
   </view>
 
@@ -35,7 +35,7 @@
         <button class="ghost-button location-btn" hover-class="hover-scale" bindtap="chooseLocation">手动选择</button>
       </view>
       <text class="muted" wx:if="{{address}}">{{address}}</text>
-      <text class="muted" wx:if="{{latitude && !address}}">坐标：{{latitude}}, {{longitude}}</text>
+      <text class="muted" wx:if="{{latitude !== '' && !address}}">坐标：{{latitude}}, {{longitude}}</text>
     </view>
 
     <view class="field ai-card">
@@ -73,7 +73,7 @@
         value="{{searchKeyword}}"
         bindinput="onSearchInput"
       />
-      <picker range="{{filteredSpeciesNames}}" value="0" bindchange="onSpeciesChange">
+      <picker range="{{filteredSpeciesNames}}" value="{{selectedFilteredIndex}}" bindchange="onSpeciesChange">
         <view class="picker-box" hover-class="hover-tap">
           {{selectedSpeciesIndex > 0 ? speciesNames[selectedSpeciesIndex] : "暂不选择"}}
         </view>
@@ -91,6 +91,12 @@
       />
     </view>
 
-    <button class="primary-button submit-button" hover-class="hover-scale" bindtap="submitReport">提交审核</button>
+    <button
+      class="primary-button submit-button"
+      hover-class="hover-scale"
+      bindtap="submitReport"
+      loading="{{isSubmitting}}"
+      disabled="{{isSubmitting || isUploading || !uploadedFileId || latitude === '' || longitude === ''}}"
+    >{{isSubmitting ? "提交中..." : "提交审核"}}</button>
   </view>
 </view>

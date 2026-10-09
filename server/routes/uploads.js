@@ -4,10 +4,11 @@ const path = require("path");
 const fs = require("fs");
 const crypto = require("crypto");
 const sharp = require("sharp");
-const { registerUpload, getUpload, removeUpload } = require("../lib/upload-store");
-const { createRecognitionJob, getRecognitionJob } = require("../lib/recognition-jobs");
+const { registerUpload, getUploadForUser } = require("../lib/upload-store");
+const { createRecognitionJob, getRecognitionJobForUser } = require("../lib/recognition-jobs");
 const { getSpeciesList } = require("../lib/store");
 const { sendError, getPublicBaseUrl } = require("../lib/helpers");
+const { authRequired } = require("../middleware/auth");
 
 const router = Router();
 
@@ -36,7 +37,7 @@ const upload = multer({
 });
 
 // POST /api/uploads
-router.post("/uploads", upload.single("image"), async (req, res) => {
+router.post("/uploads", authRequired, upload.single("image"), async (req, res) => {
   if (!req.file) {
     sendError(res, "No image uploaded.", 400);
     return;
@@ -49,13 +50,35 @@ router.post("/uploads", upload.single("image"), async (req, res) => {
       sendError(res, "Invalid image file content.", 400);
       return;
     }
+    const width = Number(metadata.width || 0);
+    const height = Number(metadata.height || 0);
+    if (!width || !height || width * height > 30_000_000) {
+      fs.unlinkSync(req.file.path);
+      sendError(res, "Image dimensions are not supported.", 400);
+      return;
+    }
+
+    // Re-encode the upload before it can be served publicly. Sharp strips EXIF/GPS
+    // metadata by default, which avoids leaking camera location from pending reports.
+    const normalizedName = `${path.parse(req.file.filename).name}-normalized.jpg`;
+    const normalizedPath = path.join(uploadsDir, normalizedName);
+    await sharp(req.file.path, { failOn: "none" })
+      .rotate()
+      .flatten({ background: "#ffffff" })
+      .jpeg({ quality: 90, mozjpeg: true })
+      .toFile(normalizedPath);
+    fs.unlinkSync(req.file.path);
+    req.file.filename = normalizedName;
+    req.file.path = normalizedPath;
+    req.file.mimetype = "image/jpeg";
+    req.file.size = fs.statSync(normalizedPath).size;
   } catch (err) {
     if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
     sendError(res, "Could not validate image file.", 400);
     return;
   }
 
-  const file = registerUpload(req.file);
+  const file = registerUpload(req.file, req.user.userId);
   const imageUrl = `${getPublicBaseUrl(req)}/uploads/${file.filename}`;
 
   res.status(201).json({
@@ -65,12 +88,12 @@ router.post("/uploads", upload.single("image"), async (req, res) => {
       originalName: file.originalName,
     },
   });
-  console.log(`[upload] fileId=${file.fileId} originalName=${file.originalName}`);
 });
 
 // POST /api/recognitions
-router.post("/recognitions", (req, res) => {
-  const uploadRecord = getUpload(req.body.fileId);
+router.post("/recognitions", authRequired, (req, res) => {
+  const fileId = req.body && req.body.fileId;
+  const uploadRecord = getUploadForUser(fileId, req.user.userId);
 
   if (!uploadRecord) {
     sendError(res, "Uploaded file not found.", 404);
@@ -78,7 +101,8 @@ router.post("/recognitions", (req, res) => {
   }
 
   const job = createRecognitionJob({
-    fileId: req.body.fileId,
+    fileId,
+    userId: req.user.userId,
     speciesList: getSpeciesList(),
   });
 
@@ -93,12 +117,11 @@ router.post("/recognitions", (req, res) => {
       status: job.status,
     },
   });
-  console.log(`[recognition] created jobId=${job.jobId} fileId=${req.body.fileId}`);
 });
 
 // GET /api/recognitions/:jobId
-router.get("/recognitions/:jobId", (req, res) => {
-  const job = getRecognitionJob(req.params.jobId);
+router.get("/recognitions/:jobId", authRequired, (req, res) => {
+  const job = getRecognitionJobForUser(req.params.jobId, req.user.userId);
 
   if (!job) {
     sendError(res, "Recognition job not found.", 404);

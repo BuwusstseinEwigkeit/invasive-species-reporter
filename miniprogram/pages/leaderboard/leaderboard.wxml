@@ -18,6 +18,11 @@
     </view>
   </view>
 
+  <view class="card leaderboard-header" wx:if="{{myRank}}">
+    <text>我的当前排名：第 {{myRank}} 名</text>
+    <text class="muted">{{myScore}} 积分</text>
+  </view>
+
   <!-- Loading -->
   <view class="loading-card" wx:if="{{loading}}">
     <view class="skeleton-line w80"></view>
@@ -25,15 +30,21 @@
     <view class="skeleton-line w90"></view>
   </view>
 
+  <view class="empty-state" wx:elif="{{loadError}}">
+    <text class="empty-icon">⚠</text>
+    <text class="muted">{{loadError}}</text>
+    <button class="ghost-button" hover-class="hover-scale" bindtap="retryLoad">重新加载</button>
+  </view>
+
   <!-- Empty -->
-  <view class="empty-state" wx:elif="{{!loading && !weeklyList.length && !totalList.length && !newcomerList.length}}">
+  <view class="empty-state" wx:elif="{{activeListEmpty}}">
     <text class="empty-icon">🏆</text>
-    <text class="muted">暂无数据</text>
+    <text class="muted">当前榜单暂无数据</text>
   </view>
 
   <!-- Weekly list -->
   <view class="rank-list" wx:elif="{{activeTab === 'weekly'}}">
-    <view class="rank-card" wx:for="{{weeklyList}}" wx:key="userId">
+    <view class="rank-card {{item.isMe ? 'active' : ''}}" wx:for="{{weeklyList}}" wx:key="userId">
       <view class="rank-left">
         <view class="rank-num {{item.rank <= 3 ? 'rank-top' : ''}}">{{item.rank <= 3 ? '' : item.rank}}</view>
         <view class="rank-avatar-wrap">
@@ -41,7 +52,7 @@
         </view>
         <view class="rank-info">
           <text class="rank-username">{{item.username}}</text>
-          <text class="muted rank-count">{{item.count}} 次上报</text>
+          <text class="muted rank-count">{{item.score}} 本周积分</text>
         </view>
       </view>
       <view wx:if="{{item.rank === 1}}" class="rank-medal">🥇</view>
@@ -52,7 +63,7 @@
 
   <!-- Total list -->
   <view class="rank-list" wx:elif="{{activeTab === 'total'}}">
-    <view class="rank-card" wx:for="{{totalList}}" wx:key="userId">
+    <view class="rank-card {{item.isMe ? 'active' : ''}}" wx:for="{{totalList}}" wx:key="userId">
       <view class="rank-left">
         <view class="rank-num {{item.rank <= 3 ? 'rank-top' : ''}}">{{item.rank <= 3 ? '' : item.rank}}</view>
         <view class="rank-avatar-wrap">
@@ -60,7 +71,7 @@
         </view>
         <view class="rank-info">
           <text class="rank-username">{{item.username}}</text>
-          <text class="muted rank-count">{{item.count}} 次已核实</text>
+          <text class="muted rank-count">{{item.score}} 总积分</text>
         </view>
       </view>
       <view wx:if="{{item.rank === 1}}" class="rank-medal">🥇</view>
@@ -71,7 +82,7 @@
 
   <!-- Newcomer list -->
   <view class="rank-list" wx:elif="{{activeTab === 'newcomer'}}">
-    <view class="rank-card" wx:for="{{newcomerList}}" wx:key="userId">
+    <view class="rank-card {{item.isMe ? 'active' : ''}}" wx:for="{{newcomerList}}" wx:key="userId">
       <view class="rank-left">
         <view class="rank-num {{item.rank <= 3 ? 'rank-top' : ''}}">{{item.rank <= 3 ? '' : item.rank}}</view>
         <view class="rank-avatar-wrap">
@@ -79,7 +90,7 @@
         </view>
         <view class="rank-info">
           <text class="rank-username">{{item.username}}</text>
-          <text class="muted rank-count">{{item.count}} 次上报</text>
+          <text class="muted rank-count">{{item.score}} 总积分</text>
         </view>
       </view>
       <view wx:if="{{item.rank === 1}}" class="rank-medal">🥇</view>

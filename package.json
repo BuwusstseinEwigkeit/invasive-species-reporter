@@ -1,10 +1,14 @@
 {
   "name": "invasive-species-reporter",
-  "version": "0.5.0",
+  "version": "0.8.0",
   "private": true,
-  "description": "一个记录和上报外来物种的个人小程序项目。写着玩的。",
+  "description": "外来物种上报、识别、审核与积分闭环微信小程序。",
   "scripts": {
-    "start": "node server/index.js"
+    "start": "node server/index.js",
+    "test": "jest --runInBand --forceExit",
+    "test:ci": "jest --runInBand",
+    "check:js": "find server miniprogram -name '*.js' -print0 | xargs -0 -n1 node --check",
+    "check": "npm run check:js && npm test"
   },
   "dependencies": {
     "better-sqlite3": "^12.9.0",

@@ -37,12 +37,25 @@
         <view class="filter-box" hover-class="hover-tap">{{speciesNames[selectedSpeciesIndex]}}</view>
       </picker>
 
+      <view class="empty-state compact" wx:if="{{loading && !allReports.length}}">
+        <text class="muted">正在加载点位…</text>
+      </view>
+
+      <view class="empty-state compact" wx:elif="{{loadError && !allReports.length}}">
+        <text class="muted">{{loadError}}</text>
+        <button class="ghost-button" hover-class="hover-scale" bindtap="retryLoad">重新加载</button>
+      </view>
+
+      <view class="empty-state compact" wx:elif="{{!reports.length}}">
+        <text class="muted">当前筛选下暂无已核实点位</text>
+      </view>
+
       <view
         class="report-row"
         hover-class="hover-bg"
         wx:for="{{reports}}"
         wx:key="id"
-        data-id="{{item.speciesId}}"
+        data-id="{{item.id}}"
         bindtap="openDetail"
       >
         <view>

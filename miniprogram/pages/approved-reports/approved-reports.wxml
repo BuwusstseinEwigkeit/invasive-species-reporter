@@ -15,6 +15,12 @@
     <view class="skeleton-line w70"></view>
   </view>
 
+  <view wx:elif="{{loadError && !reports.length}}" class="empty-state">
+    <text class="empty-icon">⚠</text>
+    <text class="muted">{{loadError}}</text>
+    <button class="ghost-button" hover-class="hover-scale" bindtap="retryLoad">重新加载</button>
+  </view>
+
   <view wx:elif="{{!filteredReports.length}}" class="empty-state">
     <text class="empty-icon">✅</text>
     <text class="muted">暂无已核实记录</text>
@@ -26,7 +32,7 @@
       hover-class="hover-bg"
       wx:for="{{filteredReports}}"
       wx:key="id"
-      data-id="{{item.speciesId}}"
+      data-id="{{item.id}}"
       bindtap="openDetail"
     >
       <view class="report-main">
@@ -36,5 +42,6 @@
       </view>
       <text class="status-tag">已核实</text>
     </view>
+    <text class="muted" wx:if="{{loadingMore}}">正在加载更多…</text>
   </view>
 </view>

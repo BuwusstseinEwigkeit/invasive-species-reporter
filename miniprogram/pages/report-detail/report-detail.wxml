@@ -1,0 +1,78 @@
+<view class="page-shell">
+  <view class="loading-card" wx:if="{{loading}}">
+    <view class="skeleton-line w80"></view>
+    <view class="skeleton-line w60"></view>
+    <view class="skeleton-line w70"></view>
+  </view>
+
+  <view class="empty-state" wx:elif="{{error}}">
+    <text class="empty-icon">📄</text>
+    <text class="muted">{{error}}</text>
+    <button class="ghost-button" wx:if="{{reportId}}" hover-class="hover-scale" bindtap="retryLoad">重新加载</button>
+  </view>
+
+  <block wx:elif="{{report}}">
+    <view class="card detail-card">
+      <view class="detail-head">
+        <view>
+          <text class="detail-title">{{report.aiTop1 || "待人工审核"}}</text>
+          <text class="muted">{{report.createdAt}}</text>
+        </view>
+        <text class="status-tag tag-{{report.status}}">{{statusText}}</text>
+      </view>
+
+      <image
+        wx:if="{{report.imageUrl}}"
+        class="report-image"
+        src="{{report.imageUrl}}"
+        mode="aspectFill"
+        lazy-load
+        bindtap="previewImage"
+      />
+
+      <view class="detail-row">
+        <text class="field-label">地点</text>
+        <text class="detail-value">{{report.address || "未填写地址"}}</text>
+      </view>
+      <view class="detail-row">
+        <text class="field-label">坐标</text>
+        <text class="detail-value">{{report.latitude}}, {{report.longitude}}</text>
+      </view>
+      <view class="detail-row">
+        <text class="field-label">补充说明</text>
+        <text class="detail-value">{{report.remark || "无"}}</text>
+      </view>
+      <view class="detail-row">
+        <text class="field-label">AI 置信度</text>
+        <text class="detail-value">{{report.aiScoreText}}</text>
+      </view>
+
+      <view class="detail-row" wx:if="{{report.pointsEligible === false}}">
+        <text class="field-label">积分结算</text>
+        <text class="detail-value">该线索与近期位置重复，不重复发放积分和信用奖励。</text>
+      </view>
+
+      <view class="candidate-list" wx:if="{{report.aiCandidates && report.aiCandidates.length}}">
+        <text class="field-label">AI 候选</text>
+        <view class="candidate-row" wx:for="{{report.aiCandidates}}" wx:key="speciesId">
+          <text>{{item.speciesName}}</text>
+          <text class="muted">{{item.confidenceText}}</text>
+        </view>
+      </view>
+
+      <view class="detail-actions">
+        <button class="ghost-button" hover-class="hover-scale" bindtap="openSpecies">查看物种资料</button>
+        <button class="ghost-button" hover-class="hover-scale" bindtap="openLocation">查看位置</button>
+      </view>
+    </view>
+
+    <view class="card review-card" wx:if="{{review.length}}">
+      <text class="section-title">审核记录</text>
+      <view class="review-log" wx:for="{{review}}" wx:key="id">
+        <text class="review-action">{{item.actionText}}</text>
+        <text class="detail-value">{{item.comment || "无审核备注"}}</text>
+        <text class="muted">{{item.createdAt}}</text>
+      </view>
+    </view>
+  </block>
+</view>

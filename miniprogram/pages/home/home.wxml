@@ -25,6 +25,18 @@
     </view>
   </view>
 
+  <view class="loading-card" wx:if="{{loading && !species.length}}">
+    <view class="skeleton-line w80"></view>
+    <view class="skeleton-line w60"></view>
+    <view class="skeleton-line w90"></view>
+  </view>
+
+  <view class="empty-state" wx:elif="{{loadError && !species.length}}">
+    <text class="empty-icon">⚠</text>
+    <text class="muted">{{loadError}}</text>
+    <button class="ghost-button" hover-class="hover-scale" bindtap="retryLoad">重新加载</button>
+  </view>
+
   <!-- Stats -->
   <view class="card stats-card" wx:if="{{stats}}">
     <view class="section-header" hover-class="hover-tap" bindtap="toggleStats">

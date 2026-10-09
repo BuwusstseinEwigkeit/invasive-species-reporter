@@ -5,14 +5,11 @@ function parseJwtPayload(token) {
   try {
     var parts = token.split(".");
     if (parts.length !== 3) return {};
-    // Fix: use proper base64 decode with padding
     var base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
-    // Add padding if needed
     var padding = base64.length % 4;
     if (padding === 2) base64 += "==";
     else if (padding === 3) base64 += "=";
-    // Decode base64 manually (avoiding decodeURIComponent bugs with % sequences)
-    var decoded = "";
+    var binary = "";
     var chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     var buffer = 0;
     var bits = 0;
@@ -25,9 +22,14 @@ function parseJwtPayload(token) {
       bits += 6;
       if (bits >= 8) {
         bits -= 8;
-        decoded += String.fromCharCode((buffer >> bits) & 0xff);
+        binary += String.fromCharCode((buffer >> bits) & 0xff);
       }
     }
+    var encoded = "";
+    for (var j = 0; j < binary.length; j++) {
+      encoded += "%" + ("0" + binary.charCodeAt(j).toString(16)).slice(-2);
+    }
+    var decoded = decodeURIComponent(encoded);
     return JSON.parse(decoded) || {};
   } catch (_e) {
     return {};
@@ -57,8 +59,35 @@ function setToken(token) {
 function clearToken() {
   try {
     app.globalData.authToken = "";
+    app.globalData.role = "";
     wx.removeStorageSync("auth_token");
   } catch (_e) { /* ignore */ }
+}
+
+var authRedirecting = false;
+function handleUnauthorized() {
+  clearToken();
+  if (authRedirecting) return;
+
+  var currentRoute = "";
+  try {
+    var pages = getCurrentPages();
+    if (pages && pages.length) {
+      currentRoute = pages[pages.length - 1].route || "";
+    }
+  } catch (_e) { /* ignore */ }
+
+  if (currentRoute === "pages/login/login") return;
+  authRedirecting = true;
+  wx.showToast({ title: "登录已过期，请重新登录", icon: "none" });
+  setTimeout(function () {
+    wx.navigateTo({
+      url: "/pages/login/login",
+      complete: function () {
+        setTimeout(function () { authRedirecting = false; }, 500);
+      }
+    });
+  }, 100);
 }
 
 /**
@@ -68,9 +97,8 @@ function clearToken() {
 function resolveImageUrl(url) {
   if (!url) return "";
   if (url.indexOf("http://") === 0 || url.indexOf("https://") === 0) return url;
-  var full = (app.globalData.apiBaseUrl || "") + url;
-  console.log("[api] resolveImageUrl:", url, "→", full);
-  return full;
+  var baseUrl = app.globalData.apiBaseUrl || "";
+  return baseUrl ? baseUrl + url : "";
 }
 
 /**
@@ -82,39 +110,59 @@ function downloadImage(url) {
   return new Promise(function (resolve) {
     var fullUrl = resolveImageUrl(url);
     if (!fullUrl) {
-      console.log("[api] downloadImage: empty url, skipping");
       resolve("");
       return;
     }
-    console.log("[api] downloadImage: downloading", fullUrl);
+    var token = getToken();
     wx.downloadFile({
       url: fullUrl,
+      header: token ? { Authorization: "Bearer " + token } : {},
       success: function (res) {
-        console.log("[api] downloadImage: status=" + res.statusCode + ", temp=" + (res.tempFilePath || "(none)"));
         if (res.statusCode === 200) {
           resolve(res.tempFilePath);
         } else {
           resolve("");
         }
       },
-      fail: function (err) {
-        console.log("[api] downloadImage: FAIL", JSON.stringify(err));
+      fail: function () {
         resolve("");
       }
     });
   });
 }
 
+function apiError(message, statusCode, response) {
+  var error = new Error(message || "请求失败");
+  error.statusCode = Number(statusCode || 0);
+  error.response = response || null;
+  return error;
+}
+
+function getApiBaseUrl() {
+  var baseUrl = app.globalData.apiBaseUrl || "";
+  if (!baseUrl) {
+    throw apiError("服务地址未配置，请先设置服务器地址。", 0, null);
+  }
+  return baseUrl;
+}
+
 function request(path, options) {
   options = options || {};
   return new Promise(function (resolve, reject) {
+    var baseUrl;
+    try {
+      baseUrl = getApiBaseUrl();
+    } catch (error) {
+      reject(error);
+      return;
+    }
     var headers = { "content-type": "application/json" };
     var token = getToken();
     if (token) {
       headers["Authorization"] = "Bearer " + token;
     }
     wx.request({
-      url: (app.globalData.apiBaseUrl || "") + path,
+      url: baseUrl + path,
       method: options.method || "GET",
       data: options.data || {},
       timeout: options.timeout || 15000,
@@ -124,13 +172,14 @@ function request(path, options) {
           resolve(res.data);
           return;
         }
+        if (res.statusCode === 401) {
+          handleUnauthorized();
+        }
         var msg = (res.data && (res.data.error || res.data.message)) || "HTTP " + res.statusCode;
-        wx.showToast({ title: msg, icon: "none" });
-        reject(new Error(msg));
+        reject(apiError(msg, res.statusCode, res.data));
       },
       fail: function (error) {
-        wx.showToast({ title: "网络请求失败，请检查网络连接", icon: "none" });
-        reject(error);
+        reject(apiError("网络请求失败，请检查网络连接", 0, error));
       }
     });
   });
@@ -138,10 +187,19 @@ function request(path, options) {
 
 function uploadImage(filePath) {
   return new Promise(function (resolve, reject) {
+    var baseUrl;
+    try {
+      baseUrl = getApiBaseUrl();
+    } catch (error) {
+      reject(error);
+      return;
+    }
+    var token = getToken();
     wx.uploadFile({
-      url: (app.globalData.apiBaseUrl || "") + "/api/uploads",
+      url: baseUrl + "/api/uploads",
       filePath: filePath,
       name: "image",
+      header: token ? { Authorization: "Bearer " + token } : {},
       success: function (res) {
         try {
           var data = JSON.parse(res.data);
@@ -149,17 +207,17 @@ function uploadImage(filePath) {
             resolve(data);
             return;
           }
+          if (res.statusCode === 401) {
+            handleUnauthorized();
+          }
           var msg = (data && (data.error || data.message)) || "HTTP " + res.statusCode;
-          wx.showToast({ title: msg, icon: "none" });
-          reject(new Error(msg));
+          reject(apiError(msg, res.statusCode, data));
         } catch (error) {
-          wx.showToast({ title: "上传解析失败", icon: "none" });
-          reject(error);
+          reject(apiError("上传响应解析失败", res.statusCode, error));
         }
       },
       fail: function (err) {
-        wx.showToast({ title: "上传请求失败", icon: "none" });
-        reject(err);
+        reject(apiError("上传请求失败，请检查网络连接", 0, err));
       }
     });
   });
@@ -219,14 +277,29 @@ function getSpeciesDetail(id) {
   return request("/api/species/" + id);
 }
 
-function getReports(status) {
-  var query = status ? "?status=" + status : "";
-  return request("/api/reports" + query);
+function paginationQuery(page, limit, extra) {
+  var params = [];
+  if (extra) params.push(extra);
+  if (page) params.push("page=" + encodeURIComponent(page));
+  if (limit) params.push("limit=" + encodeURIComponent(limit));
+  return params.length ? "?" + params.join("&") : "";
 }
 
-function getMyReports(status) {
-  var query = status ? "?status=" + status : "";
-  return request("/api/reports/my" + query);
+function getReports(_status, page, limit) {
+  return request("/api/reports" + paginationQuery(page, limit));
+}
+
+function getReviewQueue(page, limit) {
+  return request("/api/reports/review-queue" + paginationQuery(page, limit));
+}
+
+function getMyReports(status, page, limit) {
+  var extra = status ? "status=" + encodeURIComponent(status) : "";
+  return request("/api/reports/my" + paginationQuery(page, limit, extra));
+}
+
+function getReportDetail(id) {
+  return request("/api/reports/" + encodeURIComponent(id));
 }
 
 function createReport(data) {
@@ -351,7 +424,7 @@ function getUserProfile(userId) {
   return request("/api/user/profile/" + userId);
 }
 
-function updateAvatar(userId, avatarUrl) {
+function updateAvatar(avatarUrl) {
   return request("/api/user/avatar", {
     method: "POST",
     data: { avatarUrl: avatarUrl }
@@ -360,10 +433,19 @@ function updateAvatar(userId, avatarUrl) {
 
 function uploadAvatar(filePath) {
   return new Promise(function (resolve, reject) {
+    var baseUrl;
+    try {
+      baseUrl = getApiBaseUrl();
+    } catch (error) {
+      reject(error);
+      return;
+    }
+    var token = getToken();
     wx.uploadFile({
-      url: (app.globalData.apiBaseUrl || "") + "/api/uploads",
+      url: baseUrl + "/api/uploads",
       filePath: filePath,
       name: "image",
+      header: token ? { Authorization: "Bearer " + token } : {},
       success: function (res) {
         try {
           var data = JSON.parse(res.data);
@@ -371,17 +453,17 @@ function uploadAvatar(filePath) {
             resolve(data);
             return;
           }
+          if (res.statusCode === 401) {
+            handleUnauthorized();
+          }
           var msg = (data && (data.error || data.message)) || "HTTP " + res.statusCode;
-          wx.showToast({ title: msg, icon: "none" });
-          reject(new Error(msg));
+          reject(apiError(msg, res.statusCode, data));
         } catch (error) {
-          wx.showToast({ title: "上传解析失败", icon: "none" });
-          reject(error);
+          reject(apiError("上传响应解析失败", res.statusCode, error));
         }
       },
       fail: function (err) {
-        wx.showToast({ title: "上传请求失败", icon: "none" });
-        reject(err);
+        reject(apiError("上传请求失败，请检查网络连接", 0, err));
       }
     });
   });
@@ -416,11 +498,28 @@ function getOrders(userId) {
   return request("/api/shop/orders/" + userId);
 }
 
+function getAdminOrders() {
+  return request("/api/shop/admin/orders");
+}
+
+function updateOrderStatus(orderId, status) {
+  return request("/api/shop/admin/orders/" + encodeURIComponent(orderId), {
+    method: "PATCH",
+    data: { status: status }
+  });
+}
+
 function exportCsv() {
-  var baseUrl = app.globalData.apiBaseUrl || "";
-  var token = getToken();
-  var url = baseUrl + "/api/reports/export/csv";
   return new Promise(function (resolve, reject) {
+    var baseUrl;
+    try {
+      baseUrl = getApiBaseUrl();
+    } catch (error) {
+      reject(error);
+      return;
+    }
+    var token = getToken();
+    var url = baseUrl + "/api/reports/export/csv";
     wx.downloadFile({
       url: url,
       header: token ? { Authorization: "Bearer " + token } : {},
@@ -440,13 +539,14 @@ function exportCsv() {
             }
           });
         } else {
-          wx.showToast({ title: "导出失败", icon: "none" });
-          reject(new Error("Export failed with status " + res.statusCode));
+          if (res.statusCode === 401) {
+            handleUnauthorized();
+          }
+          reject(apiError("导出失败", res.statusCode, null));
         }
       },
       fail: function (err) {
-        wx.showToast({ title: "导出请求失败", icon: "none" });
-        reject(err);
+        reject(apiError("导出请求失败，请检查网络连接", 0, err));
       }
     });
   });
@@ -460,7 +560,9 @@ module.exports = {
   getSpecies: getSpecies,
   getSpeciesDetail: getSpeciesDetail,
   getReports: getReports,
+  getReviewQueue: getReviewQueue,
   getMyReports: getMyReports,
+  getReportDetail: getReportDetail,
   createReport: createReport,
   reviewReport: reviewReport,
   login: login,
@@ -487,6 +589,8 @@ module.exports = {
   getLeaderboard: getLeaderboard,
   getPrivileges: getPrivileges,
   getOrders: getOrders,
+  getAdminOrders: getAdminOrders,
+  updateOrderStatus: updateOrderStatus,
   getUserProfile: getUserProfile,
   updateAvatar: updateAvatar,
   uploadAvatar: uploadAvatar

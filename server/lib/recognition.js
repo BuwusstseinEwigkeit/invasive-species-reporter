@@ -441,7 +441,8 @@ async function recognizeSpeciesFromImage({ filePath, mimeType, speciesList }) {
   const preparedImage = await prepareImageForRecognition(filePath, mimeType);
   const imageBuffer = Buffer.from(preparedImage.base64Data, "base64");
 
-  // Provider chain: Zhipu (primary) -> Ollama (local fallback) -> Moonshot -> Python -> Mock
+  // Provider chain: Zhipu (primary) -> Ollama (local fallback) -> Moonshot -> Python.
+  // Mock recognition is opt-in for production so simulated output is never mistaken for real inference.
   const providers = [];
 
   // Zhipu cloud API (primary, set ZHIPU_API_KEY to enable)
@@ -464,8 +465,12 @@ async function recognizeSpeciesFromImage({ filePath, mimeType, speciesList }) {
     providers.push({ name: "python", fn: recognizeWithPython });
   }
 
-  // Always have mock as final fallback
-  providers.push({ name: "mock", fn: recognizeWithMock });
+  const allowMock =
+    process.env.ENABLE_MOCK_RECOGNITION === "true" ||
+    (process.env.NODE_ENV !== "production" && process.env.ENABLE_MOCK_RECOGNITION !== "false");
+  if (allowMock) {
+    providers.push({ name: "mock", fn: recognizeWithMock });
+  }
 
   let lastError = null;
 
@@ -494,6 +499,8 @@ async function recognizeSpeciesFromImage({ filePath, mimeType, speciesList }) {
           continue;
         }
         result.topCandidates = validCandidates;
+        result.provider = provider.name;
+        result.isMock = provider.name === "mock";
         console.log(`[recognition] provider ${provider.name} succeeded with confidence ${result.confidence}`);
         return result;
       }
@@ -523,14 +530,12 @@ async function recognizeSpeciesFromImage({ filePath, mimeType, speciesList }) {
     }
   }
 
-  // All providers failed
+  // All configured providers failed.
   if (lastError) {
     throw lastError;
   }
 
-  // Final fallback: use mock even if it "failed" (shouldn't happen)
-  console.log(`[recognition] all providers failed, using mock as final fallback`);
-  return recognizeWithMock({ speciesList });
+  throw new Error("No recognition provider is configured.");
 }
 
 module.exports = {

@@ -8,9 +8,9 @@ function rateLimiter(req, res, next) {
     return;
   }
 
-  const clientIp = (req.headers["x-forwarded-for"] || req.socket.remoteAddress || "unknown")
-    .split(",")[0]
-    .trim();
+  // Express resolves req.ip according to the configured trust-proxy boundary.
+  // Do not trust raw X-Forwarded-For here: clients can spoof it when no trusted proxy is present.
+  const clientIp = req.ip || req.socket.remoteAddress || "unknown";
   const key = `rate:${clientIp}`;
   const now = Date.now();
 

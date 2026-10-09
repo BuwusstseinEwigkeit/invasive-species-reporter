@@ -1,5 +1,5 @@
 const crypto = require("crypto");
-const { getUpload, removeUpload } = require("./upload-store");
+const { getUploadForUser } = require("./upload-store");
 const { recognizeSpeciesFromImage } = require("./recognition");
 
 const recognitionJobs = new Map();
@@ -32,8 +32,6 @@ async function runRecognition(job, uploadRecord, speciesList) {
     job.result = result;
     job.error = "";
 
-    // Clean up upload record to free memory
-    removeUpload(job.fileId);
   } catch (error) {
     const message = error.message || "Recognition failed.";
     const retryable = isRetryableError(error);
@@ -50,13 +48,11 @@ async function runRecognition(job, uploadRecord, speciesList) {
     job.status = "failed";
     job.error = message;
 
-    // Clean up upload record even on failure
-    removeUpload(job.fileId);
   }
 }
 
-function createRecognitionJob({ fileId, speciesList }) {
-  const uploadRecord = getUpload(fileId);
+function createRecognitionJob({ fileId, userId, speciesList }) {
+  const uploadRecord = getUploadForUser(fileId, userId);
 
   if (!uploadRecord) {
     return null;
@@ -67,6 +63,7 @@ function createRecognitionJob({ fileId, speciesList }) {
   const job = {
     jobId,
     fileId,
+    userId,
     status: "queued",
     result: null,
     error: "",
@@ -84,6 +81,12 @@ function getRecognitionJob(jobId) {
   return recognitionJobs.get(jobId) || null;
 }
 
+function getRecognitionJobForUser(jobId, userId) {
+  const job = getRecognitionJob(jobId);
+  if (!job || job.userId !== userId) return null;
+  return job;
+}
+
 // Periodic cleanup of expired jobs
 const cleanupTimer = setInterval(() => {
   const now = Date.now();
@@ -97,5 +100,6 @@ if (cleanupTimer.unref) cleanupTimer.unref();
 
 module.exports = {
   createRecognitionJob,
-  getRecognitionJob
+  getRecognitionJob,
+  getRecognitionJobForUser
 };

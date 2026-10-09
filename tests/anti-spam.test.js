@@ -164,13 +164,23 @@ function testGeotemporalDuplicateDoesNotAwardPoints() {
   const lat = 31.9527;
   const lng = 118.8927;
 
-  createTestReport(user.id, lat, lng, "file1");
+  const first = createTestReport(user.id, lat, lng, "file1");
+  db.reviewReport(first.report.id, {
+    action: "approved",
+    finalSpeciesId: "species-001",
+    reviewerId: "reviewer-test"
+  });
   const afterFirst = db.getPoints(user.id).total;
   const duplicate = createTestReport(user.id, lat, lng, "file2");
+  db.reviewReport(duplicate.report.id, {
+    action: "approved",
+    finalSpeciesId: "species-001",
+    reviewerId: "reviewer-test"
+  });
   const afterDuplicate = db.getPoints(user.id).total;
 
   assertTrue(duplicate.isDupe, "second nearby report should be marked duplicate");
-  assertEqual(afterDuplicate, afterFirst, "duplicate report should not award points");
+  assertEqual(afterDuplicate, afterFirst, "duplicate approval should not award points");
   assertEqual(duplicate.pointsDelta.length, 0, "duplicate report should return no points delta");
 }
 
@@ -199,24 +209,50 @@ function testPointsSubmission() {
   const user = createTestUser("pts_" + Date.now());
   const initialPoints = db.getPoints(user.id).total;
 
-  const result = createTestReport(user.id, 31.1, 118.1, "ptfile1");
+  createTestReport(user.id, 31.1, 118.1, "ptfile1");
 
   const afterPoints = db.getPoints(user.id).total;
-  assertTrue(afterPoints >= initialPoints + 5, `should get +5 points, got ${afterPoints - initialPoints}`);
+  assertEqual(afterPoints, initialPoints, "pending report should not award spendable points");
 }
 
 function testFirstReportBonus() {
   const user = createTestUser("first_" + Date.now());
   const initialPoints = db.getPoints(user.id).total;
 
-  createTestReport(user.id, 31.1, 118.1, "firstfile1");
+  const result = createTestReport(user.id, 31.1, 118.1, "firstfile1");
+  db.reviewReport(result.report.id, {
+    action: "approved",
+    finalSpeciesId: "species-001",
+    reviewerId: "reviewer-test"
+  });
 
   const afterPoints = db.getPoints(user.id).total;
-  assertTrue(afterPoints >= initialPoints + 25, "first report should give +20 bonus on top of +5");
+  assertEqual(afterPoints, initialPoints + 45, "first approved report should settle submit + first + approval rewards");
 }
 
-function testReportWithoutCoordinates() {
-  const user = createTestUser("nocoord_" + Date.now());
+function testSpamCannotFarmPendingRewards() {
+  const user = createTestUser("spam_points_" + Date.now());
+  const result = createTestReport(user.id, 30.1, 117.1, "spamfile1");
+  assertEqual(db.getPoints(user.id).total, 0, "pending spam candidate should start with zero points");
+
+  db.reviewReport(result.report.id, {
+    action: "spam",
+    reviewerId: "reviewer-test",
+    comment: "malicious"
+  });
+
+  assertEqual(db.getPoints(user.id).total, 0, "spam cannot leave a positive balance from submission rewards");
+  const positiveSubmissionLog = db.getPoints(user.id).logs.find(
+    (log) => log.referenceId === result.report.id && (log.action === "report_submit" || log.action === "first_report")
+  );
+  assertFalse(!!positiveSubmissionLog, "spam should not have positive submission reward events");
+  const spamNotification = db.getNotifications(user.id).find((item) => item.referenceId === result.report.id);
+  assertTrue(!!spamNotification, "spam review should create a notification");
+  assertEqual(spamNotification.type, "spam", "spam notification should preserve spam type");
+}
+
+function testZeroCoordinatesAreValidForDedup() {
+  const user = createTestUser("zero_coord_" + Date.now());
   const payload = {
     userId: user.id,
     speciesId: "species-001",
@@ -227,8 +263,23 @@ function testReportWithoutCoordinates() {
     remark: ""
   };
   const result = db.createReportWithPoints(payload);
-  assertTrue(result.report && result.report.id, "should create report even without coords");
-  assertFalse(result.isDupe, "no coords = no dupe check");
+  assertTrue(result.report && result.report.id, "should create report at 0,0");
+  assertFalse(result.isDupe, "first 0,0 report should not be duplicate");
+
+  const duplicate = db.createReportWithPoints(Object.assign({}, payload, { imageFingerprint: "zero-2" }));
+  assertTrue(duplicate.isDupe, "0,0 is a valid coordinate pair and should participate in dedup");
+}
+
+function testGeotemporalDuplicateExpiresAfterTwelveHours() {
+  const user = createTestUser("geo_expire_" + Date.now());
+  const report = createTestReport(user.id, 31.9527, 118.8927, "old-file");
+  d.prepare("UPDATE reports SET created_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now', '-13 hours') WHERE id = ?")
+    .run(report.report.id);
+
+  assertFalse(
+    db.checkGeotemporalDuplicate(user.id, 31.9527, 118.8927),
+    "report older than 12 hours should not count as duplicate"
+  );
 }
 
 function testUserPrivilegesDefault() {
@@ -246,7 +297,7 @@ function testUserPrivilegesEcoGuard() {
     "ach-" + Date.now(), user.id, "eco_guard"
   );
   const priv = db.getUserPrivileges(user.id);
-  assertEqual(priv.dailyReportLimit, 7, "eco_guard → daily limit 7");
+  assertEqual(priv.dailyReportLimit, 10, "eco_guard → daily limit 10");
 }
 
 function testUserPrivilegesExpert() {
@@ -352,9 +403,11 @@ const tests = [
   { name: "Geotemporal duplicate does not award points", fn: testGeotemporalDuplicateDoesNotAwardPoints },
   { name: "Geotemporal duplicate different location", fn: testGeotemporalDuplicateDifferentLocation },
   { name: "Geotemporal duplicate far away", fn: testGeotemporalDuplicateFarAway },
-  { name: "Points submission", fn: testPointsSubmission },
-  { name: "First report bonus", fn: testFirstReportBonus },
-  { name: "Report without coordinates", fn: testReportWithoutCoordinates },
+  { name: "Geotemporal duplicate expires after 12 hours", fn: testGeotemporalDuplicateExpiresAfterTwelveHours },
+  { name: "Pending report does not award spendable points", fn: testPointsSubmission },
+  { name: "First approved report bonus", fn: testFirstReportBonus },
+  { name: "Spam cannot farm pending rewards", fn: testSpamCannotFarmPendingRewards },
+  { name: "Zero coordinates participate in dedup", fn: testZeroCoordinatesAreValidForDedup },
   { name: "User privileges default", fn: testUserPrivilegesDefault },
   { name: "User privileges eco_guard", fn: testUserPrivilegesEcoGuard },
   { name: "User privileges expert", fn: testUserPrivilegesExpert },

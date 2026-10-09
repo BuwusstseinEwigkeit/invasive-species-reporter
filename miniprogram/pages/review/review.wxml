@@ -1,13 +1,19 @@
 <view class="page-shell">
   <view class="card review-header">
     <text class="section-title">审核台</text>
-    <text class="muted">这里是演示版人工审核入口。只有审核通过的记录才会进入地图展示。</text>
+    <text class="muted">仅审核员可访问。只有审核通过的记录才会进入公开地图。</text>
   </view>
 
   <view class="loading-card" wx:if="{{loading}}">
     <view class="skeleton-line w80"></view>
     <view class="skeleton-line w60"></view>
     <view class="skeleton-line w70"></view>
+  </view>
+
+  <view class="empty-state" wx:elif="{{!loading && loadError && !reports.length}}">
+    <text class="empty-icon">⚠</text>
+    <text class="muted">{{loadError}}</text>
+    <button class="ghost-button" hover-class="hover-scale" bindtap="retryLoad">重新加载</button>
   </view>
 
   <view class="empty-state" wx:elif="{{!loading && !reports.length}}">
@@ -24,9 +30,9 @@
     <view class="candidate-wrap" wx:if="{{item.aiCandidates && item.aiCandidates.length}}">
       <view class="candidate-header" hover-class="hover-tap" data-index="{{index}}" bindtap="toggleCandidates">
         <text class="field-label">候选结果</text>
-        <view class="arrow {{collapsedCandidates.indexOf(index) >= 0 ? '' : 'arrow-down'}}"></view>
+        <view class="arrow {{item.candidateCollapsed ? '' : 'arrow-down'}}"></view>
       </view>
-      <view class="collapse-body {{collapsedCandidates.indexOf(index) >= 0 ? 'hidden' : ''}}">
+      <view class="collapse-body {{item.candidateCollapsed ? 'hidden' : ''}}">
         <view class="candidate-row" wx:for="{{item.aiCandidates}}" wx:key="speciesId" wx:for-item="cand">
           <text class="muted">{{cand.speciesName}}</text>
           <text class="muted">{{cand.confidence}}</text>
@@ -52,7 +58,7 @@
         data-index="{{index}}"
         bindchange="onSpeciesChange"
       >
-        <view class="picker-box" hover-class="hover-tap">{{speciesNames[item.reviewSpeciesIndex]}}</view>
+        <view class="picker-box" hover-class="hover-tap">{{speciesNames[item.reviewSpeciesIndex] || "请选择最终物种"}}</view>
       </picker>
     </view>
 
@@ -64,6 +70,8 @@
         data-index="{{index}}"
         data-action="approved"
         bindtap="submitReview"
+        loading="{{reviewingId === item.id}}"
+        disabled="{{reviewingId}}"
       >
         审核通过
       </button>
@@ -74,11 +82,24 @@
         data-index="{{index}}"
         data-action="rejected"
         bindtap="confirmReject"
+        disabled="{{reviewingId}}"
       >
         驳回
       </button>
+      <button
+        class="ghost-button"
+        hover-class="hover-scale"
+        data-id="{{item.id}}"
+        data-index="{{index}}"
+        bindtap="confirmSpam"
+        disabled="{{reviewingId}}"
+      >
+        标记无效
+      </button>
     </view>
   </view>
+
+  <view class="muted" wx:if="{{loadingMore}}">正在加载更多待审核记录…</view>
 </view>
 
 <view class="modal-mask" wx:if="{{showRejectModal}}" bindtap="closeRejectModal"></view>
@@ -92,7 +113,16 @@
     bindinput="onRejectInput"
   />
   <view class="modal-actions">
-    <button class="ghost-button" hover-class="hover-scale" bindtap="closeRejectModal">取消</button>
-    <button class="primary-button" hover-class="hover-scale" data-id="{{rejectReportId}}" data-index="{{rejectReportIndex}}" data-action="rejected" bindtap="submitReview">确认驳回</button>
+    <button class="ghost-button" hover-class="hover-scale" bindtap="closeRejectModal" disabled="{{rejectSubmitting}}">取消</button>
+    <button
+      class="primary-button"
+      hover-class="hover-scale"
+      data-id="{{rejectReportId}}"
+      data-index="{{rejectReportIndex}}"
+      data-action="rejected"
+      bindtap="submitReview"
+      loading="{{rejectSubmitting}}"
+      disabled="{{rejectSubmitting}}"
+    >确认驳回</button>
   </view>
 </view>

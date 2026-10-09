@@ -1,11 +1,13 @@
 const { Router } = require("express");
-const { authRequired } = require("../middleware/auth");
+const { authRequired, adminRequired } = require("../middleware/auth");
 const {
   getProducts,
   getProductCategories,
   createPurchaseFull,
   getUserPurchases,
   getOrdersByUser,
+  getAllOrders,
+  updateOrderStatus,
 } = require("../lib/store");
 const { sendError } = require("../lib/helpers");
 
@@ -50,6 +52,25 @@ router.get("/orders/:userId", authRequired, (req, res) => {
     return;
   }
   res.json({ items: getOrdersByUser(req.params.userId) });
+});
+
+router.get("/admin/orders", authRequired, adminRequired, (_req, res) => {
+  res.json({ items: getAllOrders() });
+});
+
+router.patch("/admin/orders/:orderId", authRequired, adminRequired, (req, res) => {
+  const status = req.body && req.body.status;
+  const allowed = new Set(["pending", "processing", "shipped", "completed", "cancelled"]);
+  if (!allowed.has(status)) {
+    sendError(res, "Invalid order status.", 400);
+    return;
+  }
+  const order = updateOrderStatus(req.params.orderId, status);
+  if (!order) {
+    sendError(res, "Order not found.", 404);
+    return;
+  }
+  res.json({ item: order });
 });
 
 module.exports = router;

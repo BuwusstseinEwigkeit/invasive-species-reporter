@@ -6,10 +6,12 @@
     "pages/detail/detail",
     "pages/review/review",
     "pages/my-reports/my-reports",
+    "pages/report-detail/report-detail",
     "pages/approved-reports/approved-reports",
     "pages/login/login",
     "pages/profile/profile",
     "pages/shop/shop",
+    "pages/orders/orders",
     "pages/notifications/notifications",
     "pages/leaderboard/leaderboard"
   ],

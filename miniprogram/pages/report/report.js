@@ -1,7 +1,7 @@
 const api = require("../../utils/api");
 
-Page({
-  data: {
+function initialFormState() {
+  return {
     localImageUrl: "",
     uploadedImageUrl: "",
     uploadedFileId: "",
@@ -14,31 +14,29 @@ Page({
     aiScore: "",
     aiSummary: "",
     aiCandidates: [],
-    speciesOptions: [],
-    speciesNames: ["暂不选择"],
     selectedSpeciesIndex: 0,
+    selectedFilteredIndex: 0,
     isUploading: false,
     isRecognizing: false,
+    isSubmitting: false,
     submitSuccess: false,
     searchKeyword: "",
-    filteredSpeciesNames: ["暂不选择"],
-    filteredSpeciesIndexes: [0],
     candidatesCollapsed: false,
     compressQuality: 60,
-    compressLevels: [
-      { value: 90, label: "高清 (体积较大)" },
-      { value: 60, label: "标准 (推荐)" },
-      { value: 30, label: "极限 (最小体积)" }
-    ],
-    compressLevelIndex: 1,
     stopPolling: false
-  },
+  };
+}
 
-  toggleCandidates() {
-    this.setData({ candidatesCollapsed: !this.data.candidatesCollapsed });
-  },
+Page({
+  data: Object.assign(initialFormState(), {
+    speciesOptions: [],
+    speciesNames: ["暂不选择"],
+    filteredSpeciesNames: ["暂不选择"],
+    filteredSpeciesIndexes: [0]
+  }),
 
   onShow() {
+    this.setData({ stopPolling: false });
     if (!api.getToken()) {
       wx.showModal({
         title: "请先登录",
@@ -55,41 +53,57 @@ Page({
       });
       return;
     }
-    this.loadSpecies();
+    if (!this.data.speciesOptions.length) {
+      this.loadSpecies();
+    }
   },
 
   onUnload() {
-    this.setData({ stopPolling: true });
+    this.cancelPolling(true);
+  },
+
+  cancelPolling(stopAll) {
     if (this.pollTimer) {
       clearTimeout(this.pollTimer);
       this.pollTimer = null;
     }
+    if (stopAll) {
+      this.setData({ stopPolling: true });
+    }
+  },
+
+  toggleCandidates() {
+    this.setData({ candidatesCollapsed: !this.data.candidatesCollapsed });
   },
 
   async loadSpecies() {
     try {
       const res = await api.getSpecies();
+      const items = res.items || [];
       this.setData({
-        speciesOptions: res.items,
-        speciesNames: ["暂不选择"].concat(res.items.map((item) => item.chineseName)),
-        filteredSpeciesNames: ["暂不选择"].concat(res.items.map((item) => item.chineseName)),
-        filteredSpeciesIndexes: [0].concat(res.items.map((_item, index) => index + 1))
+        speciesOptions: items,
+        speciesNames: ["暂不选择"].concat(items.map((item) => item.chineseName)),
+        filteredSpeciesNames: ["暂不选择"].concat(items.map((item) => item.chineseName)),
+        filteredSpeciesIndexes: [0].concat(items.map((_item, index) => index + 1))
       });
-    } catch (error) {
-      wx.showToast({
-        title: "物种列表加载失败",
-        icon: "none"
-      });
+    } catch (_error) {
+      wx.showToast({ title: "物种列表加载失败", icon: "none" });
     }
   },
 
-  async chooseImage() {
+  chooseImage() {
     wx.chooseMedia({
       count: 1,
       mediaType: ["image"],
       success: async (res) => {
-        const file = res.tempFiles[0];
+        const generation = (this.imageGeneration || 0) + 1;
+        this.imageGeneration = generation;
+        this.cancelPolling(false);
+
+        const file = res.tempFiles && res.tempFiles[0];
+        if (!file || !file.tempFilePath) return;
         const compressedPath = await this.compressSelectedImage(file.tempFilePath);
+        if (generation !== this.imageGeneration) return;
 
         this.setData({
           localImageUrl: compressedPath,
@@ -100,46 +114,34 @@ Page({
           aiScore: "",
           aiSummary: "",
           aiCandidates: [],
-          selectedSpeciesIndex: 0
+          selectedSpeciesIndex: 0,
+          selectedFilteredIndex: 0,
+          candidatesCollapsed: false
         });
 
-        await this.uploadAndRecognize(compressedPath);
+        await this.uploadAndRecognize(compressedPath, generation);
       }
     });
   },
 
-  onCompressChange(event) {
-    var index = Number(event.detail.value);
-    this.setData({
-      compressLevelIndex: index,
-      compressQuality: this.data.compressLevels[index].value
-    });
-  },
-
   compressSelectedImage(filePath) {
-    var quality = this.data.compressQuality;
     return new Promise((resolve) => {
       wx.compressImage({
         src: filePath,
-        quality: quality,
+        quality: this.data.compressQuality,
         success: (res) => resolve(res.tempFilePath),
         fail: () => resolve(filePath)
       });
     });
   },
 
-  async uploadAndRecognize(filePath) {
-    this.setData({
-      isUploading: true
-    });
-
-    wx.showLoading({
-      title: "上传图片中",
-      mask: true
-    });
+  async uploadAndRecognize(filePath, generation) {
+    this.setData({ isUploading: true, isRecognizing: false });
+    wx.showLoading({ title: "上传图片中", mask: true });
 
     try {
       const uploadRes = await api.uploadImage(filePath);
+      if (generation !== this.imageGeneration) return;
       const uploadItem = uploadRes.item;
 
       this.setData({
@@ -148,20 +150,17 @@ Page({
         uploadedImageUrl: uploadItem.imageUrl,
         uploadedFileId: uploadItem.fileId,
         aiTop1: "识别排队中",
-        aiSummary: "图片已上传，后台正在识别。你也可以直接提交给管理员人工审核。"
+        aiSummary: "图片已安全上传，后台正在识别。识别未完成时也可提交人工审核。"
       });
-
       wx.hideLoading();
 
       const startRes = await api.startRecognition(uploadItem.fileId);
+      if (generation !== this.imageGeneration) return;
       const jobId = startRes.item.jobId;
-
-      this.setData({
-        recognitionJobId: jobId
-      });
-
+      this.setData({ recognitionJobId: jobId });
       this.pollRecognition(jobId, 0);
     } catch (error) {
+      if (generation !== this.imageGeneration) return;
       this.setData({
         isUploading: false,
         isRecognizing: false,
@@ -170,36 +169,37 @@ Page({
         aiSummary: error.message || "请稍后重试",
         aiCandidates: []
       });
-
       wx.hideLoading();
-      wx.showToast({
-        title: "上传或识别失败",
-        icon: "none"
-      });
+      wx.showToast({ title: "上传或识别失败", icon: "none" });
     }
   },
 
+  schedulePoll(jobId, attempt, delay) {
+    if (this.data.stopPolling || jobId !== this.data.recognitionJobId) return;
+    this.pollTimer = setTimeout(() => {
+      this.pollRecognition(jobId, attempt + 1);
+    }, delay);
+  },
+
   async pollRecognition(jobId, attempt) {
-    if (this.data.stopPolling) return;
+    if (this.data.stopPolling || jobId !== this.data.recognitionJobId) return;
 
     if (attempt > 40) {
       this.setData({
         isRecognizing: false,
         aiTop1: "识别耗时较长",
-        aiSummary: "后台识别仍未完成。建议直接提交给管理员人工审核。"
+        aiSummary: "后台识别仍未完成，可直接提交人工审核。"
       });
       return;
     }
 
     try {
       const res = await api.getRecognition(jobId);
+      if (this.data.stopPolling || jobId !== this.data.recognitionJobId) return;
       const job = res.item;
 
       if (job.status === "queued" || job.status === "processing") {
-        if (this.data.stopPolling) return;
-        this.pollTimer = setTimeout(() => {
-          this.pollRecognition(jobId, attempt + 1);
-        }, 2000);
+        this.schedulePoll(jobId, attempt, 2000);
         return;
       }
 
@@ -207,7 +207,7 @@ Page({
         this.setData({
           isRecognizing: false,
           aiTop1: "识别失败",
-          aiSummary: job.error || "请直接提交人工审核",
+          aiSummary: job.error || "可直接提交人工审核",
           aiScore: "",
           aiCandidates: []
         });
@@ -218,34 +218,35 @@ Page({
       const matchedIndex = this.data.speciesOptions.findIndex(
         (item) => item.id === recognition.matchedSpeciesId
       );
+      const mockPrefix = recognition.isMock ? "模拟识别，仅供开发调试。 " : "";
 
       this.setData({
         isRecognizing: false,
         aiTop1: recognition.matchedSpeciesName || "未能可靠识别",
-        aiScore: recognition.confidence ? recognition.confidence.toFixed(2) : "",
-        aiSummary: recognition.summary || "",
+        aiScore: recognition.confidence ? Number(recognition.confidence).toFixed(2) : "",
+        aiSummary: mockPrefix + (recognition.summary || ""),
         aiCandidates: recognition.topCandidates || [],
         selectedSpeciesIndex: matchedIndex >= 0 ? matchedIndex + 1 : 0
       });
       this.syncFilteredSelection(matchedIndex >= 0 ? matchedIndex + 1 : 0);
-    } catch (error) {
+    } catch (_error) {
+      if (this.data.stopPolling || jobId !== this.data.recognitionJobId) return;
       this.setData({
-        isRecognizing: false,
-        aiTop1: "识别状态查询失败",
-        aiSummary: "图片已上传，但状态查询失败。你可以直接提交人工审核。"
+        aiSummary: "网络波动，正在继续查询识别结果…"
       });
+      this.schedulePoll(jobId, attempt, Math.min(5000, 2000 + attempt * 100));
     }
   },
 
   async retryRecognition() {
-    if (!this.data.uploadedFileId) {
-      wx.showToast({
-        title: "请先上传图片",
-        icon: "none"
-      });
+    if (!this.data.uploadedFileId || this.data.isRecognizing) {
+      if (!this.data.uploadedFileId) {
+        wx.showToast({ title: "请先上传图片", icon: "none" });
+      }
       return;
     }
 
+    this.cancelPolling(false);
     this.setData({
       isRecognizing: true,
       aiTop1: "重新识别中",
@@ -257,11 +258,7 @@ Page({
     try {
       const startRes = await api.startRecognition(this.data.uploadedFileId);
       const jobId = startRes.item.jobId;
-
-      this.setData({
-        recognitionJobId: jobId
-      });
-
+      this.setData({ recognitionJobId: jobId });
       this.pollRecognition(jobId, 0);
     } catch (error) {
       this.setData({
@@ -295,69 +292,67 @@ Page({
         this.setData({
           latitude: res.latitude,
           longitude: res.longitude,
-          address: res.address || res.name
+          address: res.address || res.name || ""
         });
       }
     });
   },
 
   onRemarkInput(event) {
-    this.setData({
-      remark: event.detail.value
-    });
+    this.setData({ remark: event.detail.value });
   },
 
   onSpeciesChange(event) {
     const filteredIndex = Number(event.detail.value);
     const actualIndex = this.data.filteredSpeciesIndexes[filteredIndex] || 0;
     this.setData({
-      selectedSpeciesIndex: actualIndex
+      selectedSpeciesIndex: actualIndex,
+      selectedFilteredIndex: filteredIndex
     });
   },
 
   onSearchInput(event) {
-    const keyword = (event.detail.value || "").trim().toLowerCase();
+    const rawKeyword = event.detail.value || "";
+    const keyword = rawKeyword.trim().toLowerCase();
     const filtered = this.data.speciesOptions
-      .map((item, index) => ({
-        item,
-        actualIndex: index + 1
-      }))
+      .map((item, index) => ({ item, actualIndex: index + 1 }))
       .filter(({ item }) => {
-        if (!keyword) {
-          return true;
-        }
-
+        if (!keyword) return true;
         return (
-          item.chineseName.toLowerCase().includes(keyword) ||
-          item.latinName.toLowerCase().includes(keyword) ||
-          item.category.toLowerCase().includes(keyword)
+          String(item.chineseName || "").toLowerCase().includes(keyword) ||
+          String(item.latinName || "").toLowerCase().includes(keyword) ||
+          String(item.category || "").toLowerCase().includes(keyword)
         );
       });
 
+    const filteredIndexes = [0].concat(filtered.map(({ actualIndex }) => actualIndex));
+    const selectedFilteredIndex = filteredIndexes.indexOf(this.data.selectedSpeciesIndex);
     this.setData({
-      searchKeyword: event.detail.value || "",
+      searchKeyword: rawKeyword,
       filteredSpeciesNames: ["暂不选择"].concat(filtered.map(({ item }) => item.chineseName)),
-      filteredSpeciesIndexes: [0].concat(filtered.map(({ actualIndex }) => actualIndex))
+      filteredSpeciesIndexes: filteredIndexes,
+      selectedFilteredIndex: selectedFilteredIndex >= 0 ? selectedFilteredIndex : 0
     });
   },
 
   syncFilteredSelection(actualIndex) {
     const foundIndex = this.data.filteredSpeciesIndexes.findIndex((item) => item === actualIndex);
-
     if (foundIndex === -1) {
       this.setData({
         filteredSpeciesNames: ["暂不选择"].concat(this.data.speciesOptions.map((item) => item.chineseName)),
-        filteredSpeciesIndexes: [0].concat(this.data.speciesOptions.map((_item, index) => index + 1))
+        filteredSpeciesIndexes: [0].concat(this.data.speciesOptions.map((_item, index) => index + 1)),
+        searchKeyword: "",
+        selectedFilteredIndex: actualIndex
       });
+      return;
     }
+    this.setData({ selectedFilteredIndex: foundIndex });
   },
 
   async submitReport() {
-    if (!this.data.uploadedImageUrl || !this.data.latitude) {
-      wx.showToast({
-        title: "请先完成上传并补全位置",
-        icon: "none"
-      });
+    if (this.data.isSubmitting) return;
+    if (!this.data.uploadedFileId || this.data.latitude === "" || this.data.longitude === "") {
+      wx.showToast({ title: "请先完成上传并补全位置", icon: "none" });
       return;
     }
 
@@ -366,48 +361,54 @@ Page({
         ? this.data.speciesOptions[this.data.selectedSpeciesIndex - 1]
         : null;
 
+    this.setData({ isSubmitting: true });
     try {
       await api.createReport({
-        imageUrl: this.data.uploadedImageUrl,
+        fileId: this.data.uploadedFileId,
+        recognitionJobId: this.data.recognitionJobId || "",
         latitude: this.data.latitude,
         longitude: this.data.longitude,
         address: this.data.address,
         remark: this.data.remark,
-        speciesId: selectedSpecies ? selectedSpecies.id : null,
-        aiTop1: this.data.aiTop1,
-        aiScore: this.data.aiScore ? Number(this.data.aiScore) : 0,
-        aiCandidates: this.data.aiCandidates
+        speciesId: selectedSpecies ? selectedSpecies.id : null
       });
 
-      wx.showToast({
-        title: "已提交审核",
-        icon: "success"
-      });
-
-      setTimeout(() => {
-        this.setData({ submitSuccess: true });
-      }, 700);
+      this.cancelPolling(false);
+      wx.showToast({ title: "已提交审核", icon: "success" });
+      this.resetForm(true);
     } catch (error) {
-      var msg = error.message || "";
+      const msg = error.message || "";
       if (msg.includes("上报已达上限")) {
         wx.showModal({
           title: "今日上报已达上限",
-          content: "今日提交次数已用完（每日最多5次）。\n\n提升信用分可增加次数：\n• 审核通过每次 +2 分\n• 保持良好记录\n\n信用分 < 60：每日限2次\n信用分 ≥ 60：每日限5次",
+          content: msg + "\n可在“我的”页面查看信用分和徽章带来的每日额度。",
           showCancel: false,
           confirmText: "我知道了"
         });
       } else {
-        wx.showToast({
-          title: msg || "提交失败",
-          icon: "none",
-          duration: 2500
-        });
+        wx.showToast({ title: msg || "提交失败", icon: "none", duration: 2500 });
+      }
+    } finally {
+      if (!this.data.submitSuccess) {
+        this.setData({ isSubmitting: false });
       }
     }
   },
 
+  resetForm(keepSuccess) {
+    this.imageGeneration = (this.imageGeneration || 0) + 1;
+    this.cancelPolling(false);
+    this.setData(Object.assign(initialFormState(), {
+      submitSuccess: !!keepSuccess,
+      speciesOptions: this.data.speciesOptions,
+      speciesNames: this.data.speciesNames,
+      filteredSpeciesNames: this.data.speciesNames,
+      filteredSpeciesIndexes: [0].concat(this.data.speciesOptions.map((_item, index) => index + 1))
+    }));
+  },
+
   goHome() {
-    this.setData({ submitSuccess: false });
+    this.resetForm(false);
     wx.switchTab({ url: "/pages/home/home" });
   }
 });

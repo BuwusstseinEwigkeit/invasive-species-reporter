@@ -1,7 +1,7 @@
 # 数据结构
 
 > 以 `server/lib/database.js` → `initSchema()` 为准。
-> 最后更新：2026-05-02
+> 最后更新：2026-10-09
 
 ## `species`
 
@@ -38,6 +38,7 @@
 | remark | TEXT | 用户备注 |
 | status | TEXT | pending / approved / rejected / spam |
 | image_fingerprint | TEXT | 图片 MD5 指纹 |
+| points_eligible | INTEGER | 是否参与正向积分/信用/徽章结算（1/0）；地理时空重复记录为 0 |
 | created_at | TEXT | 上报时间（UTC ISO 8601） |
 
 索引：`idx_reports_status(status)`, `idx_reports_species(species_id)`, `idx_reports_user(user_id)`
@@ -51,6 +52,7 @@
 | password_hash | TEXT | pbkdf2 哈希（salt:hash 格式） |
 | role | TEXT | user / reviewer / admin |
 | openid | TEXT | 微信 openid（唯一） |
+| avatar_url | TEXT | 用户头像媒体路径 |
 | created_at | TEXT | 创建时间（UTC ISO 8601） |
 
 ## `review_logs`
@@ -129,7 +131,7 @@
 | id | TEXT | 主键（UUID 格式） |
 | user_id | TEXT | 用户 ID |
 | product_id | TEXT | 商品 ID |
-| status | TEXT | pending / shipped / completed / cancelled |
+| status | TEXT | pending / processing / shipped / completed / cancelled |
 | shipping_name | TEXT | 收货人姓名 |
 | shipping_phone | TEXT | 收货人电话 |
 | shipping_address | TEXT | 收货地址 |
@@ -154,7 +156,7 @@
 | user_id | TEXT | 接收用户 |
 | title | TEXT | 标题 |
 | body | TEXT | 内容 |
-| type | TEXT | info / approved / rejected / achievement |
+| type | TEXT | info / approved / rejected / spam / achievement |
 | reference_id | TEXT | 关联对象 ID |
 | is_read | INTEGER | 是否已读（0/1） |
 | created_at | TEXT | 时间（UTC ISO 8601） |

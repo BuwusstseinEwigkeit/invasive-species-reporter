@@ -20,6 +20,22 @@ function authRequired(req, res, next) {
   }
 }
 
+function authOptional(req, _res, next) {
+  const header = req.headers.authorization || "";
+  const token = header.replace("Bearer ", "");
+  if (!token) {
+    req.user = null;
+    next();
+    return;
+  }
+  try {
+    req.user = jwt.verify(token, JWT_SECRET);
+  } catch (_err) {
+    req.user = null;
+  }
+  next();
+}
+
 function reviewerRequired(req, res, next) {
   if (!req.user) {
     res.status(401).json({ success: false, error: "Authentication required.", code: 401 });
@@ -41,4 +57,24 @@ function reviewerRequired(req, res, next) {
   next();
 }
 
-module.exports = { authRequired, reviewerRequired };
+function adminRequired(req, res, next) {
+  if (!req.user) {
+    res.status(401).json({ success: false, error: "Authentication required.", code: 401 });
+    return;
+  }
+
+  const user = db.getUserById(req.user.userId);
+  if (!user) {
+    res.status(401).json({ success: false, error: "User not found.", code: 401 });
+    return;
+  }
+  if (user.role !== "admin") {
+    res.status(403).json({ success: false, error: "Admin role required.", code: 403 });
+    return;
+  }
+
+  req.userRole = user.role;
+  next();
+}
+
+module.exports = { authRequired, authOptional, reviewerRequired, adminRequired };

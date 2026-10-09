@@ -1,55 +1,83 @@
 const { Router } = require("express");
-const { authRequired, reviewerRequired } = require("../middleware/auth");
+const { authRequired, authOptional, reviewerRequired } = require("../middleware/auth");
 const {
   getReports,
   getReportsByUser,
+  getReportById,
+  getReviewLogs,
   getApprovedReportsForExport,
   reviewReport,
-  updateUserCredit,
-  createNotification,
-  checkAndAwardAchievements,
+  getUserPrivileges,
+  getUserProfile,
 } = require("../lib/store");
-const pointsLedger = require("../lib/points-ledger");
 const { createUserReport } = require("../lib/report-submission");
 const { sendError } = require("../lib/helpers");
 
 const router = Router();
 const REVIEW_ACTIONS = new Set(["approved", "rejected", "spam"]);
 
-// GET /api/reports
-router.get("/", (req, res) => {
-  const result = getReports(req.query.status, req.query.page, req.query.limit);
-  res.json({
-    items: result.items,
+function publicReport(report) {
+  if (!report) return report;
+  return {
+    id: report.id,
+    speciesId: report.speciesId,
+    aiTop1: report.aiTop1,
+    aiScore: report.aiScore,
+    aiCandidates: report.aiCandidates,
+    imageUrl: report.imageUrl,
+    latitude: report.latitude,
+    longitude: report.longitude,
+    address: report.address,
+    remark: report.remark,
+    status: report.status,
+    createdAt: report.createdAt,
+  };
+}
+
+function paginationPayload(result, mapper) {
+  return {
+    items: result.items.map(mapper || ((item) => item)),
     page: result.pagination.page,
     limit: result.pagination.limit,
     total: result.pagination.total,
     totalPages: result.pagination.totalPages,
-  });
+  };
+}
+
+// Public feed: only approved reports are ever exposed.
+router.get("/", (req, res) => {
+  const result = getReports("approved", req.query.page, req.query.limit);
+  res.json(paginationPayload(result, publicReport));
 });
 
-// GET /api/reports/my
+// Reviewer queue: pending reports contain private/raw submission data.
+router.get("/review-queue", authRequired, reviewerRequired, (req, res) => {
+  const result = getReports("pending", req.query.page, req.query.limit);
+  res.json(paginationPayload(result));
+});
+
+// Current user's own reports.
 router.get("/my", authRequired, (req, res) => {
   const result = getReportsByUser(req.user.userId, req.query.status, req.query.page, req.query.limit);
-  res.json({
-    items: result.items,
-    page: result.pagination.page,
-    limit: result.pagination.limit,
-    total: result.pagination.total,
-    totalPages: result.pagination.totalPages,
-  });
+  res.json(paginationPayload(result));
 });
 
-// GET /api/reports/export/csv
-router.get("/export/csv", authRequired, (_req, res) => {
-  const rows = getApprovedReportsForExport();
+// Privileged CSV export.
+router.get("/export/csv", authRequired, (req, res) => {
+  const profile = getUserProfile(req.user.userId);
+  const privileges = getUserPrivileges(req.user.userId);
+  const elevated = profile && (profile.role === "reviewer" || profile.role === "admin");
+  if (!elevated && !privileges.canExportReports) {
+    sendError(res, "Export permission required.", 403);
+    return;
+  }
 
+  const rows = getApprovedReportsForExport();
   const bom = "\uFEFF";
   const headers = [
     "ID", "用户ID", "识别物种", "拉丁名", "识别置信度",
     "入侵等级", "物种类别", "原产地",
-    "经度", "纬度", "地点", "备注", "图片URL",
-    "上报时间",
+    "经度", "纬度", "地点", "备注", "图片URL", "上报时间",
   ];
 
   const csvRows = rows.map((r) =>
@@ -58,30 +86,52 @@ router.get("/export/csv", authRequired, (_req, res) => {
       r.ai_score !== null ? Number(r.ai_score).toFixed(2) : "",
       r.species_risk || "", r.species_category || "", r.species_origin || "",
       r.longitude, r.latitude, r.address || "",
-      (r.remark || "").replace(/"/g, '""'),
-      r.image_url || "", r.created_at,
+      r.remark || "", r.image_url || "", r.created_at,
     ]
-      .map((v) => (v === null || v === undefined ? "" : `"${String(v).replace(/"/g, '""')}"`))
+      .map((value) => (value === null || value === undefined ? "" : `"${String(value).replace(/"/g, '""')}"`))
       .join(",")
   );
 
   const csv = bom + headers.join(",") + "\n" + csvRows.join("\n");
-
   res.setHeader("Content-Type", "text/csv; charset=utf-8");
   res.setHeader("Content-Disposition", `attachment; filename="invasive-species-export-${Date.now()}.csv"`);
   res.send(csv);
 });
 
-// POST /api/reports
+// Report detail: approved reports are public. Draft/rejected/spam reports are owner/reviewer only.
+router.get("/:id", authOptional, (req, res) => {
+  const report = getReportById(req.params.id);
+  if (!report) {
+    sendError(res, "Not Found", 404);
+    return;
+  }
+
+  const profile = req.user ? getUserProfile(req.user.userId) : null;
+  const canViewPrivate = !!req.user && (
+    report.userId === req.user.userId ||
+    (profile && (profile.role === "reviewer" || profile.role === "admin"))
+  );
+
+  if (report.status === "approved" && !canViewPrivate) {
+    res.json({ item: publicReport(report), review: [] });
+    return;
+  }
+
+  if (!canViewPrivate) {
+    sendError(res, "Not Found", 404);
+    return;
+  }
+
+  res.json({ item: report, review: getReviewLogs(report.id) });
+});
+
+// Create a report from a server-owned upload/recognition chain.
 router.post("/", authRequired, (req, res) => {
   try {
-    const userId = req.user.userId;
-    const result = createUserReport(userId, req.body || {});
-    const isDupe = result.isDupe;
-
+    const result = createUserReport(req.user.userId, req.body || {});
     res.status(201).json({
       item: result.report,
-      message: isDupe
+      message: result.isDupe
         ? "上报已创建（重复位置，不发放积分）。"
         : "上报已创建，等待审核。",
       pointsDelta: result.pointsDelta,
@@ -89,73 +139,33 @@ router.post("/", authRequired, (req, res) => {
   } catch (error) {
     if (error.statusCode) {
       sendError(res, error.message, error.statusCode);
-    } else {
-      sendError(res, "Invalid request", 400);
+      return;
     }
+    sendError(res, "Report submission failed.", 500);
   }
 });
 
-// POST /api/reports/:id/review
+// Reviewer decision. Database layer enforces pending-only, idempotent and atomic side-effects.
 router.post("/:id/review", authRequired, reviewerRequired, (req, res) => {
   try {
-    if (!REVIEW_ACTIONS.has(req.body && req.body.action)) {
+    const action = req.body && req.body.action;
+    if (!REVIEW_ACTIONS.has(action)) {
       sendError(res, "action must be approved/rejected/spam", 400);
       return;
     }
 
-    const payload = {
+    const result = reviewReport(req.params.id, {
       ...req.body,
       reviewerId: req.user.userId,
-    };
-
-    const result = reviewReport(req.params.id, payload);
+    });
 
     if (!result) {
       sendError(res, "Not Found", 404);
       return;
     }
-
-    if (payload.action === "approved") {
-      const report = result.report;
-      if (report && report.userId && report.userId !== "user-anonymous") {
-        try {
-          pointsLedger.awardReportApproved(report.userId, report.id);
-          const isHighQuality = report.aiScore > 0.95 || payload.highQuality;
-          if (isHighQuality) {
-            pointsLedger.awardHighQualityReport(report.userId, report.id);
-          }
-          updateUserCredit(report.userId, 2);
-          createNotification(
-            report.userId,
-            "上报已通过审核",
-            `您的上报「${report.aiTop1}」已通过审核${isHighQuality ? "（高质量+10）" : ""}，获得 ${isHighQuality ? 30 : 20} 积分奖励。`,
-            "approved",
-            report.id
-          );
-          const newlyEarned = checkAndAwardAchievements(report.userId);
-          if (newlyEarned.length > 0) {
-            createNotification(report.userId, "🏆 获得新成就", `恭喜获得「${newlyEarned[0].name}」成就！`, "achievement", null);
-          }
-        } catch (_e) { /* optional */ }
-      }
-    } else if (payload.action === "rejected") {
-      const report = result.report;
-      if (report && report.userId && report.userId !== "user-anonymous") {
-        try {
-          updateUserCredit(report.userId, -3);
-          const reason = payload.comment ? `原因：${payload.comment}` : "请查看审核意见。";
-          createNotification(report.userId, "上报未通过审核", `您的上报「${report.aiTop1}」未通过审核。${reason}`, "rejected", report.id);
-        } catch (_e) { /* optional */ }
-      }
-    } else if (payload.action === "spam") {
-      const report = result.report;
-      if (report && report.userId && report.userId !== "user-anonymous") {
-        try {
-          pointsLedger.penalizeSpamReport(report.userId, report.id);
-          updateUserCredit(report.userId, -10);
-          createNotification(report.userId, "⚠️ 上报被标记为无效", `您的上报「${report.aiTop1}」被判定为垃圾上报，积分-10，信用分-10。`, "rejected", report.id);
-        } catch (_e) { /* optional */ }
-      }
+    if (result.conflict) {
+      sendError(res, "This report has already been reviewed.", 409);
+      return;
     }
 
     res.json({
@@ -163,7 +173,11 @@ router.post("/:id/review", authRequired, reviewerRequired, (req, res) => {
       review: result.log,
     });
   } catch (error) {
-    sendError(res, "Invalid JSON body", 400);
+    if (error.statusCode) {
+      sendError(res, error.message, error.statusCode);
+      return;
+    }
+    sendError(res, "Review failed.", 500);
   }
 });
 

@@ -14,7 +14,7 @@
     <view class="card user-card">
       <view class="user-avatar-wrap" hover-class="hover-tap" bindtap="onChangeAvatar">
         <image class="user-avatar-img" src="{{avatarUrl || '/images/avatar-placeholder.png'}}" mode="aspectFill" />
-        <view class="user-avatar-badge">{{username.slice(0, 1).toUpperCase()}}</view>
+        <view class="user-avatar-badge">{{avatarInitial}}</view>
         <view class="avatar-edit-hint">点击修改</view>
       </view>
       <view class="user-info">
@@ -45,6 +45,7 @@
     <view class="card points-card">
       <text class="points-number">{{points}}</text>
       <text class="muted points-label">当前积分</text>
+      <text class="muted points-label">信用分 {{credit}} · 每日上报 {{privileges.dailyReportLimit}} 次</text>
       <view class="points-actions">
         <button class="ghost-button" hover-class="hover-scale" bindtap="goShop">积分商城</button>
       </view>
@@ -59,12 +60,7 @@
       <view class="collapse-body {{logsCollapsed ? 'hidden' : ''}}">
         <view class="log-row" wx:for="{{pointsLogs}}" wx:key="id">
           <view class="log-left">
-            <text class="log-action">
-              {{item.action === 'report_submit' ? '上报奖励' : ''}}
-              {{item.action === 'report_approved' ? '审核通过奖励' : ''}}
-              {{item.action === 'purchase' ? '兑换商品' : ''}}
-              {{item.action !== 'report_submit' && item.action !== 'report_approved' && item.action !== 'purchase' ? item.action : ''}}
-            </text>
+            <text class="log-action">{{item.actionText}}</text>
             <text class="muted log-time">{{item.createdAt}}</text>
           </view>
           <text class="log-amount {{item.amount > 0 ? 'positive' : 'negative'}}">
@@ -95,6 +91,21 @@
       <view class="menu-item" hover-class="hover-bg" bindtap="goShop">
         <text class="menu-icon">🎁</text>
         <text class="menu-label">积分商城</text>
+        <text class="menu-arrow">›</text>
+      </view>
+      <view class="menu-item" hover-class="hover-bg" bindtap="goOrders">
+        <text class="menu-icon">📦</text>
+        <text class="menu-label">兑换与订单</text>
+        <text class="menu-arrow">›</text>
+      </view>
+      <view class="menu-item" hover-class="hover-bg" bindtap="goLeaderboard">
+        <text class="menu-icon">🏆</text>
+        <text class="menu-label">积分排行榜</text>
+        <text class="menu-arrow">›</text>
+      </view>
+      <view class="menu-item" hover-class="hover-bg" wx:if="{{privileges.canExportReports || role === 'reviewer' || role === 'admin'}}" bindtap="goExport">
+        <text class="menu-icon">📤</text>
+        <text class="menu-label">导出已核实数据</text>
         <text class="menu-arrow">›</text>
       </view>
       <view class="menu-item" hover-class="hover-bg" wx:if="{{role === 'reviewer' || role === 'admin'}}" bindtap="goReview">

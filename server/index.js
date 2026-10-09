@@ -7,6 +7,10 @@ const db = require("./lib/database");
 
 // --- Configuration ---
 const app = express();
+const trustProxy = String(process.env.TRUST_PROXY || "").trim();
+if (trustProxy === "1" || trustProxy.toLowerCase() === "true") {
+  app.set("trust proxy", 1);
+}
 const PORT = Number(process.env.PORT || 3000);
 const JWT_SECRET = process.env.JWT_SECRET;
 
@@ -58,7 +62,7 @@ app.use(require("./middleware/cors"));
 app.use(require("./middleware/rate-limit").rateLimiter);
 app.use(require("./middleware/security"));
 app.use(express.json({ limit: "2mb" }));
-app.use("/uploads", express.static(uploadsDir));
+app.use(require("./routes/media"));
 app.use("/static", express.static(path.join(__dirname, "static")));
 
 // --- Routes ---
@@ -76,12 +80,31 @@ app.use("/api", require("./routes/misc"));
 
 // --- Error handler ---
 app.use((error, _req, res, _next) => {
-  console.error("[server] request failed:", error);
   const isProduction = process.env.NODE_ENV === "production";
-  res.status(400).json({
+  let status = Number(error.statusCode || error.status || 500);
+  if (!Number.isInteger(status) || status < 400 || status > 599) status = 500;
+
+  let message = error.message || "Request failed.";
+  if (error.type === "entity.parse.failed") {
+    status = 400;
+    message = "请求体 JSON 格式错误。";
+  } else if (error.code === "LIMIT_FILE_SIZE") {
+    status = 413;
+    message = "上传文件过大。";
+  } else if (isProduction && status >= 500) {
+    message = "请求处理失败，请稍后重试。";
+  }
+
+  if (status >= 500) {
+    console.error("[server] request failed:", error);
+  } else if (process.env.NODE_ENV !== "test") {
+    console.warn(`[server] request rejected (${status}): ${message}`);
+  }
+
+  res.status(status).json({
     success: false,
-    error: isProduction ? "请求处理失败，请稍后重试。" : (error.message || "Request failed."),
-    code: 400,
+    error: message,
+    code: status,
   });
 });
 

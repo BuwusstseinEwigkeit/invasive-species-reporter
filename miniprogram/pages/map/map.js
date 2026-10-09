@@ -5,13 +5,16 @@ Page({
     latitude: 32.06,
     longitude: 118.78,
     markers: [],
+    markerReportIds: [],
     reports: [],
     allReports: [],
     speciesOptions: [],
     speciesNames: ["全部物种"],
     selectedSpeciesIndex: 0,
     panelCollapsed: false,
-    heatmapEnabled: true
+    heatmapEnabled: true,
+    loading: true,
+    loadError: ""
   },
 
   togglePanel() {
@@ -22,40 +25,89 @@ Page({
     this.loadMapData();
   },
 
+  onPullDownRefresh() {
+    this.loadMapData().finally(function () {
+      wx.stopPullDownRefresh();
+    });
+  },
+
+  retryLoad() {
+    this.loadMapData();
+  },
+
   onMapLoaded() {
-    // Map is ready — now apply heatmap if there are cached reports
-    if (this.data.reports && this.data.reports.length > 0) {
+    if (this.data.heatmapEnabled && this.data.reports.length) {
       this.updateHeatmap(this.data.reports);
     }
   },
 
+  async fetchAllApprovedReports() {
+    var page = 1;
+    var totalPages = 1;
+    var items = [];
+    do {
+      var res = await api.getReports("approved", page, 100);
+      items = items.concat(res.items || []);
+      totalPages = Number(res.totalPages || 1);
+      page += 1;
+    } while (page <= totalPages);
+    return items;
+  },
+
   async loadMapData() {
+    this.setData({ loading: true, loadError: "" });
     try {
-      const [reportsRes, speciesRes] = await Promise.all([
-        api.getReports("approved"),
+      const results = await Promise.all([
+        this.fetchAllApprovedReports(),
         api.getSpecies()
       ]);
+      const reports = results[0];
+      const speciesItems = results[1].items || [];
 
       this.setData({
-        allReports: reportsRes.items,
-        speciesOptions: speciesRes.items,
-        speciesNames: ["全部物种"].concat(speciesRes.items.map((item) => item.chineseName))
+        allReports: reports,
+        speciesOptions: speciesItems,
+        speciesNames: ["全部物种"].concat(speciesItems.map((item) => item.chineseName)),
+        loading: false,
+        loadError: ""
       });
+      this.applyFilter(this.data.selectedSpeciesIndex);
 
-      this.applyFilter(0);
+      const firstValid = reports.find((item) => this.validCoordinate(item));
+      if (firstValid) {
+        this.setData({
+          latitude: Number(firstValid.latitude),
+          longitude: Number(firstValid.longitude)
+        });
+      }
+
+      wx.getLocation({
+        type: "gcj02",
+        success: (location) => {
+          this.setData({
+            latitude: location.latitude,
+            longitude: location.longitude
+          });
+        }
+      });
     } catch (error) {
-      wx.showToast({
-        title: "地图数据加载失败",
-        icon: "none"
+      this.setData({
+        loading: false,
+        loadError: error.message || "地图数据加载失败"
       });
     }
   },
 
+  validCoordinate(item) {
+    const lat = Number(item.latitude);
+    const lng = Number(item.longitude);
+    return Number.isFinite(lat) && Number.isFinite(lng) &&
+      lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+  },
+
   onSpeciesChange(event) {
     const selectedSpeciesIndex = Number(event.detail.value);
-    this.setData({
-      selectedSpeciesIndex
-    });
+    this.setData({ selectedSpeciesIndex });
     this.applyFilter(selectedSpeciesIndex);
   },
 
@@ -67,10 +119,12 @@ Page({
       ? this.data.allReports.filter((item) => item.speciesId === selectedSpecies.id)
       : this.data.allReports.slice();
 
-    const markers = reports.map((item, index) => ({
+    const markerReports = reports.filter((item) => this.validCoordinate(item));
+    const markerReportIds = markerReports.map((item) => item.id);
+    const markers = markerReports.map((item, index) => ({
       id: index,
-      latitude: item.latitude,
-      longitude: item.longitude,
+      latitude: Number(item.latitude),
+      longitude: Number(item.longitude),
       width: 36,
       height: 36,
       title: item.aiTop1,
@@ -87,93 +141,95 @@ Page({
       }
     }));
 
-    this.setData({
-      reports,
-      markers
-    });
+    this.setData({ reports, markers, markerReportIds });
 
-    this.updateHeatmap(reports);
+    if (this.data.heatmapEnabled) {
+      this.updateHeatmap(reports);
+    } else {
+      this.removeHeatmap();
+    }
   },
 
   buildHeatmapPoints(reports) {
     var coordMap = {};
-    reports.forEach(function (item) {
+    reports.forEach((item) => {
+      if (!this.validCoordinate(item)) return;
       var lat = Number(item.latitude);
       var lng = Number(item.longitude);
-      // Skip invalid coords (0,0 is ocean — outside valid China range)
-      if (!lat || lat < 20 || lat > 60 || !lng || lng < 70 || lng > 140) return;
-      var key = lat.toFixed(2) + "," + lng.toFixed(2);
+      var key = lat.toFixed(3) + "," + lng.toFixed(3);
       if (coordMap[key]) {
         coordMap[key].weight += 1;
       } else {
         coordMap[key] = { latitude: lat, longitude: lng, weight: 1 };
       }
     });
-    return Object.keys(coordMap).map(function (key) { return coordMap[key]; });
+    return Object.keys(coordMap).map(function (key) {
+      return coordMap[key];
+    });
+  },
+
+  removeHeatmap() {
+    try {
+      var mapCtx = wx.createMapContext("risk-map");
+      mapCtx.removeHeatMap({
+        fail: function () { /* unsupported runtime: ignore */ }
+      });
+    } catch (_e) { /* ignore */ }
   },
 
   updateHeatmap(reports) {
+    if (!this.data.heatmapEnabled) {
+      this.removeHeatmap();
+      return;
+    }
     var points = this.buildHeatmapPoints(reports);
-    if (points.length === 0) {
-      wx.showToast({ title: "暂无有效坐标用于热力图", icon: "none", duration: 1500 });
+    if (!points.length) {
+      this.removeHeatmap();
       return;
     }
 
     try {
       var mapCtx = wx.createMapContext("risk-map");
-      mapCtx.addHeatMap({
-        points: points,
-        radius: 30,
-        opacity: 0.7,
-        colorGradient: {
-          points: [0, 0.3, 0.5, 0.7, 1.0],
-          colors: ["#7fc8a9", "#6abf8b", "#e8b435", "#e06c3a", "#c0392b"]
-        },
-        success: function () {
-          console.log("[heatmap] addHeatMap success, points=" + points.length);
-        },
-        fail: function (err) {
-          console.log("[heatmap] addHeatMap fail:", JSON.stringify(err));
+      mapCtx.removeHeatMap({
+        complete: function () {
+          mapCtx.addHeatMap({
+            points: points,
+            radius: 30,
+            opacity: 0.7,
+            colorGradient: {
+              points: [0, 0.3, 0.5, 0.7, 1],
+              colors: ["#7fc8a9", "#6abf8b", "#e8b435", "#e06c3a", "#c0392b"]
+            }
+          });
         }
       });
-    } catch (_e) {
-      console.log("[heatmap] addHeatMap unavailable");
-    }
+    } catch (_e) { /* heatmap unsupported */ }
   },
 
   toggleHeatmap() {
     var enabled = !this.data.heatmapEnabled;
     this.setData({ heatmapEnabled: enabled });
-
     if (enabled) {
       this.updateHeatmap(this.data.reports);
     } else {
-      try {
-        var mapCtx = wx.createMapContext("risk-map");
-        mapCtx.removeHeatMap({
-          success: function () { console.log("[heatmap] removed"); },
-          fail: function () { console.log("[heatmap] remove failed"); }
-        });
-      } catch (_e) { /* ignore */ }
+      this.removeHeatmap();
     }
   },
 
   onMarkerTap(event) {
-    const markerId = event.detail.markerId;
-    if (markerId === undefined) return;
-    const report = this.data.reports[markerId];
-    if (report && report.speciesId) {
-      wx.navigateTo({
-        url: `/pages/detail/detail?id=${report.speciesId}`
-      });
-    }
+    const markerId = Number(event.detail.markerId);
+    const reportId = this.data.markerReportIds[markerId];
+    this.openReport(reportId);
   },
 
   openDetail(event) {
-    const { id } = event.currentTarget.dataset;
-    if (!id || id === "null" || id === "undefined") return;
+    this.openReport(event.currentTarget.dataset.id);
+  },
+
+  openReport(id) {
+    if (!id) return;
     wx.navigateTo({
-      url: `/pages/detail/detail?id=${id}`
+      url: "/pages/report-detail/report-detail?id=" + encodeURIComponent(id)
     });
   }
 });

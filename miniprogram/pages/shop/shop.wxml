@@ -18,6 +18,12 @@
     <view class="skeleton-line w90"></view>
   </view>
 
+  <view class="empty-state" wx:elif="{{loadError}}">
+    <text class="empty-icon">⚠</text>
+    <text class="muted">{{loadError}}</text>
+    <button class="ghost-button" hover-class="hover-scale" bindtap="retryLoad">重新加载</button>
+  </view>
+
   <!-- Empty -->
   <view class="empty-state" wx:elif="{{!loading && !products.length}}">
     <text class="empty-icon">🎁</text>
@@ -35,7 +41,7 @@
           <view class="product-card" wx:if="{{product.categoryId === item.id}}">
             <view class="product-image">
               <image wx:if="{{productLocalImages[product.id]}}" class="product-img" src="{{productLocalImages[product.id]}}" mode="aspectFill" />
-              <text wx:else class="product-img-placeholder">{{product.name.slice(0, 1)}}</text>
+              <text wx:else class="product-img-placeholder">{{product.placeholderInitial}}</text>
               <view class="product-tag {{product.isVirtual ? 'tag-digital' : 'tag-physical'}}">
                 {{product.isVirtual ? '数字' : '实物'}}
               </view>
@@ -50,6 +56,8 @@
                   hover-class="hover-scale"
                   data-id="{{product.id}}"
                   bindtap="buyProduct"
+                  loading="{{buying && confirmingProductId === product.id}}"
+                  disabled="{{buying || confirmingProductId}}"
                   wx:if="{{points >= product.pointsCost || !loggedIn}}"
                 >兑换</button>
                 <button class="ghost-button buy-btn disabled-btn" wx:else>积分不足</button>
@@ -84,8 +92,8 @@
       </view>
     </view>
     <view class="modal-footer">
-      <button class="ghost-button" bindtap="hideShippingForm">取消</button>
-      <button class="primary-button" bindtap="submitShippingPurchase" disabled="{{buying}}">确认兑换</button>
+      <button class="ghost-button" bindtap="hideShippingForm" disabled="{{buying || confirmingProductId}}">取消</button>
+      <button class="primary-button" bindtap="submitShippingPurchase" loading="{{buying}}" disabled="{{buying || confirmingProductId}}">确认兑换</button>
     </view>
   </view>
 </view>

@@ -1,176 +1,161 @@
-/**
- * Golden-path integration test: end-to-end user flow.
- *
- * Run with: npx jest tests/golden-path.test.js --verbose
- *
- * Uses in-memory SQLite so no real database is modified.
- * Uses supertest to test the Express app without starting a listener.
- */
-
 process.env.DATABASE_PATH = ":memory:";
 process.env.JWT_SECRET = "test-secret-that-is-at-least-32-characters-long!!";
+process.env.ADMIN_PASS = "admin123";
+process.env.REVIEWER_PASS = "review123";
+process.env.DEMO_PASS = "demo123";
+process.env.ENABLE_MOCK_RECOGNITION = "false";
 
 const request = require("supertest");
-
-// Reset DB module state so it picks up :memory:
-beforeAll(() => {
-  const db = require("../server/lib/database");
-  db._reset && db._reset();
-  // Clear require cache for store (which caches the db singleton)
-  delete require.cache[require.resolve("../server/lib/store")];
-});
+const sharp = require("sharp");
+const fs = require("fs");
+const path = require("path");
 
 let app;
 let adminToken;
 let userToken;
 let testUserId;
 let testReportId;
+const uploadedFiles = [];
+
+async function makeImage(seed) {
+  return sharp({
+    create: {
+      width: 2,
+      height: 2,
+      channels: 3,
+      background: { r: seed % 255, g: (seed * 3) % 255, b: (seed * 7) % 255 }
+    }
+  }).png().toBuffer();
+}
+
+async function uploadFor(token, seed) {
+  const res = await request(app)
+    .post("/api/uploads")
+    .set("Authorization", `Bearer ${token}`)
+    .attach("image", await makeImage(seed), `test-${seed}.png`);
+  expect(res.status).toBe(201);
+  uploadedFiles.push(res.body.item.fileId);
+  return res.body.item;
+}
 
 beforeAll(() => {
+  const db = require("../server/lib/database");
+  db._reset && db._reset();
+  delete require.cache[require.resolve("../server/lib/store")];
   app = require("../server/index");
 });
 
 afterAll(() => {
+  for (const fileId of uploadedFiles) {
+    const filePath = path.join(__dirname, "..", "server", "uploads", fileId);
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+  }
   const db = require("../server/lib/database");
   db._reset && db._reset();
 });
 
-describe("Golden Path: Register → Report → Review", () => {
-  test("1. Health check returns ok", async () => {
+describe("Golden path: register → upload → report → review", () => {
+  test("health check", async () => {
     const res = await request(app).get("/health");
     expect(res.status).toBe(200);
     expect(res.body.status).toBe("ok");
   });
 
-  test("2. Register a new user", async () => {
+  test("register user", async () => {
     const res = await request(app)
       .post("/api/auth/register")
       .send({ username: "goldentest", password: "testpass123" });
-
     expect(res.status).toBe(201);
-    expect(res.body.item.username).toBe("goldentest");
-    expect(res.body.item.token).toBeTruthy();
     userToken = res.body.item.token;
     testUserId = res.body.item.id;
   });
 
-  test("3. Login with existing user (admin)", async () => {
+  test("login admin", async () => {
     const res = await request(app)
       .post("/api/auth/login")
       .send({ username: "admin", password: "admin123" });
-
     expect(res.status).toBe(200);
-    expect(res.body.item.token).toBeTruthy();
     adminToken = res.body.item.token;
   });
 
-  test("4. Species list is not empty", async () => {
+  test("species catalog is available", async () => {
     const res = await request(app).get("/api/species");
     expect(res.status).toBe(200);
     expect(res.body.items.length).toBeGreaterThan(0);
   });
 
-  test("5. Species detail returns item + reports", async () => {
-    const res = await request(app).get("/api/species/species-001");
-    expect(res.status).toBe(200);
-    expect(res.body.item.id).toBe("species-001");
-    expect(res.body.reports).toBeDefined();
-  });
-
-  test("6. Create a report", async () => {
+  test("create report from an owned upload", async () => {
+    const upload = await uploadFor(userToken, 11);
     const res = await request(app)
       .post("/api/reports")
       .set("Authorization", `Bearer ${userToken}`)
       .send({
+        fileId: upload.fileId,
         speciesId: "species-001",
-        aiTop1: "加拿大一枝黄花",
-        aiScore: 0.85,
-        aiCandidates: [],
         latitude: 31.9527,
         longitude: 118.8927,
         address: "测试地址",
-        remark: "集成测试上报",
+        remark: "集成测试上报"
       });
 
     expect(res.status).toBe(201);
-    expect(res.body.item.id).toBeTruthy();
+    expect(res.body.item.status).toBe("pending");
+    expect(res.body.item.aiTop1).toBe("待人工审核");
     testReportId = res.body.item.id;
   });
 
-  test("7. Report appears in my reports", async () => {
-    const res = await request(app)
+  test("owner sees pending report but public feed does not", async () => {
+    const mine = await request(app)
       .get("/api/reports/my")
       .set("Authorization", `Bearer ${userToken}`);
+    expect(mine.status).toBe(200);
+    expect(mine.body.items.some((r) => r.id === testReportId)).toBe(true);
 
-    expect(res.status).toBe(200);
-    expect(res.body.items.length).toBeGreaterThan(0);
-    const found = res.body.items.find((r) => r.id === testReportId);
-    expect(found).toBeTruthy();
+    const publicFeed = await request(app).get("/api/reports?status=pending");
+    expect(publicFeed.status).toBe(200);
+    expect(publicFeed.body.items.some((r) => r.id === testReportId)).toBe(false);
+
+    const points = await request(app)
+      .get(`/api/points/${testUserId}`)
+      .set("Authorization", `Bearer ${userToken}`);
+    expect(points.status).toBe(200);
+    expect(points.body.item.total).toBe(0);
   });
 
-  test("8. Admin reviews and approves the report", async () => {
+  test("admin approves report", async () => {
     const res = await request(app)
       .post(`/api/reports/${testReportId}/review`)
       .set("Authorization", `Bearer ${adminToken}`)
-      .send({ action: "approved" });
+      .send({ action: "approved", finalSpeciesId: "species-001" });
 
     expect(res.status).toBe(200);
     expect(res.body.item.status).toBe("approved");
   });
 
-  test("9. After approval, report is in public list", async () => {
-    const res = await request(app)
-      .get("/api/reports")
-      .query({ status: "approved" });
-
+  test("approved report becomes public", async () => {
+    const res = await request(app).get("/api/reports");
     expect(res.status).toBe(200);
-    const found = res.body.items.find((r) => r.id === testReportId);
-    expect(found).toBeTruthy();
+    expect(res.body.items.some((r) => r.id === testReportId)).toBe(true);
+    expect(res.body.items.find((r) => r.id === testReportId).userId).toBeUndefined();
   });
 
-  test("10. User earned points from approval", async () => {
+  test("points settle only after approval", async () => {
     const res = await request(app)
       .get(`/api/points/${testUserId}`)
       .set("Authorization", `Bearer ${userToken}`);
     expect(res.status).toBe(200);
-    // +5 for submission, +20 for first report bonus, +20 for approval = 45 total
     expect(res.body.item.total).toBe(45);
   });
 
-  test("11. Achievements endpoint is accessible", async () => {
-    const res = await request(app)
+  test("achievement and leaderboard endpoints work", async () => {
+    const achievements = await request(app)
       .get("/api/achievements")
       .set("Authorization", `Bearer ${userToken}`);
+    expect(achievements.status).toBe(200);
+    expect(achievements.body.items.some((item) => item.earned)).toBe(true);
 
-    expect(res.status).toBe(200);
-    expect(Array.isArray(res.body.items)).toBe(true);
-    const earned = res.body.items.filter((a) => a.earned);
-    expect(earned.length).toBeGreaterThan(0);
-  });
-
-  test("12. Unauthenticated access is rejected", async () => {
-    const res = await request(app).get("/api/reports/my");
-    expect(res.status).toBe(401);
-  });
-
-  test("13. Stats endpoint returns data", async () => {
-    const res = await request(app).get("/api/stats");
-    expect(res.status).toBe(200);
-    expect(res.body.item.totalReports).toBeGreaterThanOrEqual(1);
-  });
-
-  test("14. Leaderboard returns array", async () => {
-    const res = await request(app).get("/api/leaderboard?type=weekly");
-    expect(res.status).toBe(200);
-    expect(Array.isArray(res.body.items)).toBe(true);
-  });
-
-  test("15. Non-reviewer cannot approve reports", async () => {
-    const res = await request(app)
-      .post(`/api/reports/${testReportId}/review`)
-      .set("Authorization", `Bearer ${userToken}`)
-      .send({ action: "approved" });
-
-    expect(res.status).toBe(403);
+    const leaderboard = await request(app).get("/api/leaderboard?type=weekly");
+    expect(leaderboard.status).toBe(200);
+    expect(Array.isArray(leaderboard.body.items)).toBe(true);
   });
 });

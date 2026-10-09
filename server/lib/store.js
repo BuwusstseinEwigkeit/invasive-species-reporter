@@ -37,6 +37,16 @@ function getReportsByUser(userId, status, page, limit) {
   return db.getReportsByUser(userId, status, page, limit);
 }
 
+function getReportById(id) {
+  ensureInitialized();
+  return db.getReportById(id);
+}
+
+function getReviewLogs(reportId) {
+  ensureInitialized();
+  return db.getReviewLogs(reportId);
+}
+
 function getSpeciesReports(speciesId) {
   ensureInitialized();
   return db.getSpeciesReports(speciesId);
@@ -72,9 +82,9 @@ function getUnreadNotificationCount(userId) {
   return db.getUnreadNotificationCount(userId);
 }
 
-function markNotificationRead(id) {
+function markNotificationRead(id, userId) {
   ensureInitialized();
-  return db.markNotificationRead(id);
+  return db.markNotificationRead(id, userId);
 }
 
 function markAllNotificationsRead(userId) {
@@ -158,8 +168,12 @@ function getOrdersByUser(userId) {
   return db.getOrdersByUser(userId);
 }
 
+function getAllOrders() {
+  return db.getAllOrders();
+}
+
 function updateOrderStatus(orderId, status) {
-  db.updateOrderStatus(orderId, status);
+  return db.updateOrderStatus(orderId, status);
 }
 
 function getLeaderboard(type, limit) {
@@ -179,6 +193,8 @@ module.exports = {
   getSpeciesById,
   getReports,
   getReportsByUser,
+  getReportById,
+  getReviewLogs,
   getSpeciesReports,
   createReport,
   reviewReport,
@@ -207,6 +223,7 @@ module.exports = {
   getUserPrivileges,
   createPurchaseFull,
   getOrdersByUser,
+  getAllOrders,
   updateOrderStatus,
   getLeaderboard,
   updateUserAvatar,

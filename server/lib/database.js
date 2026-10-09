@@ -56,6 +56,7 @@ function initSchema() {
       address TEXT DEFAULT '',
       remark TEXT DEFAULT '',
       status TEXT DEFAULT 'pending',
+      points_eligible INTEGER NOT NULL DEFAULT 1,
       created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
       FOREIGN KEY (species_id) REFERENCES species(id) ON DELETE SET NULL
     );
@@ -238,6 +239,9 @@ function initSchema() {
   try {
     d.exec("ALTER TABLE reports ADD COLUMN image_fingerprint TEXT");
   } catch (_e) { /* column already exists */ }
+  try {
+    d.exec("ALTER TABLE reports ADD COLUMN points_eligible INTEGER NOT NULL DEFAULT 1");
+  } catch (_e) { /* column already exists */ }
 }
 
 function seedSpecies(speciesList) {
@@ -356,6 +360,7 @@ function rowToReport(row) {
     address: row.address,
     remark: row.remark,
     status: row.status,
+    pointsEligible: row.points_eligible === undefined ? true : !!row.points_eligible,
     createdAt: row.created_at
   };
 }
@@ -440,11 +445,18 @@ function getReportsByUser(userId, status, page, limit) {
 }
 
 function getSpeciesReports(speciesId) {
-  return getDb().prepare("SELECT * FROM reports WHERE species_id = ? ORDER BY created_at DESC").all(speciesId).map(rowToReport);
+  return getDb().prepare(
+    "SELECT * FROM reports WHERE species_id = ? AND status = 'approved' ORDER BY created_at DESC"
+  ).all(speciesId).map(rowToReport);
 }
 
 function getReportById(id) {
   const row = getDb().prepare("SELECT * FROM reports WHERE id = ?").get(id);
+  return row ? rowToReport(row) : null;
+}
+
+function getReportByImageUrl(imageUrl) {
+  const row = getDb().prepare("SELECT * FROM reports WHERE image_url = ? ORDER BY created_at DESC LIMIT 1").get(imageUrl);
   return row ? rowToReport(row) : null;
 }
 
@@ -472,37 +484,133 @@ function createReport(payload) {
 
 function reviewReport(reportId, payload) {
   const d = getDb();
-  const target = d.prepare("SELECT * FROM reports WHERE id = ?").get(reportId);
-  if (!target) return null;
+  const transact = d.transaction(() => {
+    const target = d.prepare("SELECT * FROM reports WHERE id = ?").get(reportId);
+    if (!target) return null;
+    if (target.status !== "pending") {
+      return {
+        conflict: true,
+        report: rowToReport(target),
+        log: null
+      };
+    }
 
-  d.prepare("UPDATE reports SET status = ?, species_id = ? WHERE id = ?").run(
-    payload.action,
-    payload.finalSpeciesId || target.species_id,
-    reportId
-  );
+    const finalSpeciesId = payload.finalSpeciesId || target.species_id || null;
+    let finalSpecies = null;
+    if (payload.action === "approved") {
+      if (!finalSpeciesId) {
+        const error = new Error("通过审核前必须选择最终物种。");
+        error.statusCode = 400;
+        throw error;
+      }
+      finalSpecies = getSpeciesById(finalSpeciesId);
+      if (!finalSpecies) {
+        const error = new Error("最终物种不存在。");
+        error.statusCode = 400;
+        throw error;
+      }
+    } else if (finalSpeciesId) {
+      finalSpecies = getSpeciesById(finalSpeciesId);
+    }
 
-  const finalSpecies = payload.finalSpeciesId ? getSpeciesById(payload.finalSpeciesId) : null;
-  if (finalSpecies) {
-    d.prepare("UPDATE reports SET ai_top1 = ? WHERE id = ?").run(finalSpecies.chineseName, reportId);
-  }
+    d.prepare("UPDATE reports SET status = ?, species_id = ?, ai_top1 = ? WHERE id = ?").run(
+      payload.action,
+      finalSpeciesId,
+      finalSpecies ? finalSpecies.chineseName : target.ai_top1,
+      reportId
+    );
 
-  const logId = `review-${Date.now()}`;
-  d.prepare(`
-    INSERT INTO review_logs (id, report_id, reviewer_id, action, final_species_id, comment)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `).run(
-    logId,
-    reportId,
-    payload.reviewerId || "reviewer-demo",
-    payload.action,
-    payload.finalSpeciesId || null,
-    payload.comment || ""
-  );
+    const logId = `review-${crypto.randomUUID()}`;
+    d.prepare(`
+      INSERT INTO review_logs (id, report_id, reviewer_id, action, final_species_id, comment)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(
+      logId,
+      reportId,
+      payload.reviewerId || "reviewer-demo",
+      payload.action,
+      finalSpeciesId,
+      String(payload.comment || "").slice(0, 1000)
+    );
 
-  return {
-    report: getReportById(reportId),
-    log: rowToReviewLog(d.prepare("SELECT * FROM review_logs WHERE id = ?").get(logId))
-  };
+    const userId = target.user_id;
+    if (userId && userId !== "user-anonymous") {
+      if (payload.action === "approved") {
+        const pointsEligible = target.points_eligible === undefined || target.points_eligible !== 0;
+        const isHighQuality = Number(target.ai_score || 0) >= 0.95;
+        const privileges = getUserPrivileges(userId);
+        let rewardTotal = 0;
+
+        if (pointsEligible) {
+          const submitted = addPoints(userId, 5, "report_submit", reportId);
+          if (!submitted.duplicate) rewardTotal += 5;
+
+          const approved = addPoints(userId, 20, "report_approved", reportId);
+          if (!approved.duplicate) rewardTotal += 20;
+
+          const approvedCount = d.prepare(
+            "SELECT COUNT(*) AS c FROM reports WHERE user_id = ? AND status = 'approved' AND points_eligible = 1"
+          ).get(userId).c;
+          if (approvedCount === 1) {
+            const first = addPoints(userId, 20, "first_report", reportId);
+            if (!first.duplicate) rewardTotal += 20;
+          } else if (checkStreakBonus(userId)) {
+            const streak = addPoints(userId, 10, "streak_bonus", reportId);
+            if (!streak.duplicate) rewardTotal += 10;
+          }
+
+          if (isHighQuality) {
+            const highQualityAmount = 10 + privileges.highQualityBonus;
+            const highQuality = addPoints(userId, highQualityAmount, "high_quality", reportId);
+            if (!highQuality.duplicate) rewardTotal += highQualityAmount;
+          }
+
+          updateUserCredit(userId, 2);
+        }
+        createNotification(
+          userId,
+          "上报已通过审核",
+          pointsEligible
+            ? `您的上报「${finalSpecies ? finalSpecies.chineseName : target.ai_top1}」已通过审核，获得 ${rewardTotal} 积分奖励。`
+            : `您的上报「${finalSpecies ? finalSpecies.chineseName : target.ai_top1}」已通过审核；该线索与近期位置重复，不重复发放积分和信用奖励。`,
+          "approved",
+          reportId
+        );
+        const newlyEarned = checkAndAwardAchievements(userId);
+        for (const achievement of newlyEarned) {
+          createNotification(userId, "🏆 获得新成就", `恭喜获得「${achievement.name}」成就！`, "achievement", reportId);
+        }
+      } else if (payload.action === "rejected") {
+        addPoints(userId, -3, "report_rejected", reportId);
+        updateUserCredit(userId, -3);
+        createNotification(
+          userId,
+          "上报未通过审核",
+          `您的上报「${target.ai_top1}」未通过审核。${payload.comment ? `原因：${payload.comment}` : "请查看审核意见。"}`,
+          "rejected",
+          reportId
+        );
+      } else if (payload.action === "spam") {
+        addPoints(userId, -10, "report_spam", reportId);
+        updateUserCredit(userId, -10);
+        createNotification(
+          userId,
+          "⚠️ 上报被标记为无效",
+          `您的上报「${target.ai_top1}」被判定为垃圾上报，积分 -10，信用分 -10。`,
+          "spam",
+          reportId
+        );
+      }
+    }
+
+    return {
+      conflict: false,
+      report: getReportById(reportId),
+      log: rowToReviewLog(d.prepare("SELECT * FROM review_logs WHERE id = ?").get(logId))
+    };
+  });
+
+  return transact();
 }
 
 function getReviewLogs(reportId) {
@@ -548,9 +656,13 @@ function hashPassword(password) {
 }
 
 function verifyPassword(password, storedHash) {
+  if (!storedHash || typeof storedHash !== "string") return false;
   const [salt, hash] = storedHash.split(":");
+  if (!salt || !hash) return false;
   const verify = crypto.pbkdf2Sync(password, salt, 100000, 64, "sha512").toString("hex");
-  return hash === verify;
+  const expected = Buffer.from(hash, "hex");
+  const actual = Buffer.from(verify, "hex");
+  return expected.length === actual.length && crypto.timingSafeEqual(expected, actual);
 }
 
 function createUser(username, password, role = "user") {
@@ -577,6 +689,12 @@ function getUserByUsername(username) {
 function getUserById(id) {
   const row = getDb().prepare("SELECT * FROM users WHERE id = ?").get(id);
   return row ? rowToUser(row) : null;
+}
+
+function hasPublicAvatarUrl(avatarUrl) {
+  if (!avatarUrl) return false;
+  const row = getDb().prepare("SELECT 1 AS found FROM users WHERE avatar_url = ? LIMIT 1").get(avatarUrl);
+  return !!row;
 }
 
 function getUserByOpenId(openid) {
@@ -646,18 +764,41 @@ function rowToPointsLog(row) {
 
 function addPoints(userId, amount, action, referenceId) {
   const d = getDb();
-  const existing = d.prepare("SELECT * FROM points WHERE user_id = ?").get(userId);
-  if (existing) {
-    d.prepare("UPDATE points SET total = total + ?, updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE user_id = ?").run(amount, userId);
-  } else {
-    d.prepare("INSERT INTO points (user_id, total) VALUES (?, ?)").run(userId, Math.max(0, amount));
+  if (referenceId) {
+    const duplicate = d.prepare(
+      "SELECT id FROM points_log WHERE user_id = ? AND action = ? AND reference_id = ? LIMIT 1"
+    ).get(userId, action, referenceId);
+    if (duplicate) {
+      const current = d.prepare("SELECT total FROM points WHERE user_id = ?").get(userId);
+      return { total: current ? current.total : 0, logId: duplicate.id, duplicate: true };
+    }
   }
-  const id = `points-${Date.now()}-${crypto.randomBytes(4).toString("hex")}`;
-  d.prepare("INSERT INTO points_log (id, user_id, amount, action, reference_id) VALUES (?, ?, ?, ?, ?)").run(
-    id, userId, amount, action, referenceId || null
-  );
-  const total = d.prepare("SELECT total FROM points WHERE user_id = ?").get(userId).total;
-  return { total, logId: id };
+
+  const apply = () => {
+    const existing = d.prepare("SELECT * FROM points WHERE user_id = ?").get(userId);
+    const currentTotal = existing ? Number(existing.total || 0) : 0;
+    const nextTotal = Math.max(0, currentTotal + amount);
+    const effectiveAmount = nextTotal - currentTotal;
+
+    if (existing) {
+      d.prepare("UPDATE points SET total = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE user_id = ?")
+        .run(nextTotal, userId);
+    } else {
+      d.prepare("INSERT INTO points (user_id, total) VALUES (?, ?)").run(userId, nextTotal);
+    }
+
+    if (effectiveAmount === 0) {
+      return { total: nextTotal, logId: null };
+    }
+
+    const id = `points-${crypto.randomUUID()}`;
+    d.prepare("INSERT INTO points_log (id, user_id, amount, action, reference_id) VALUES (?, ?, ?, ?, ?)").run(
+      id, userId, effectiveAmount, action, referenceId || null
+    );
+    return { total: nextTotal, logId: id };
+  };
+
+  return d.inTransaction ? apply() : d.transaction(apply)();
 }
 
 // --- Product queries ---
@@ -679,27 +820,6 @@ function rowToProduct(row) {
     requirement: row.requirement || "",
     sortOrder: row.sort_order || 0
   };
-}
-
-function seedProducts(products) {
-  const d = getDb();
-  const insert = d.prepare(`
-    INSERT OR REPLACE INTO products (id, name, description, points_cost, image_url, stock)
-    VALUES (@id, @name, @description, @pointsCost, @imageUrl, @stock)
-  `);
-  const seedMany = d.transaction((items) => {
-    for (const item of items) {
-      insert.run({
-        id: item.id,
-        name: item.name,
-        description: item.description,
-        pointsCost: item.pointsCost,
-        imageUrl: item.imageUrl || "",
-        stock: item.stock !== undefined ? item.stock : 999
-      });
-    }
-  });
-  seedMany(products);
 }
 
 function getUserPurchases(userId) {
@@ -740,9 +860,9 @@ function getUnreadNotificationCount(userId) {
   return row ? row.c : 0;
 }
 
-function markNotificationRead(id) {
-  getDb().prepare("UPDATE notifications SET is_read = 1 WHERE id = ?").run(id);
-  const row = getDb().prepare("SELECT * FROM notifications WHERE id = ?").get(id);
+function markNotificationRead(id, userId) {
+  getDb().prepare("UPDATE notifications SET is_read = 1 WHERE id = ? AND user_id = ?").run(id, userId);
+  const row = getDb().prepare("SELECT * FROM notifications WHERE id = ? AND user_id = ?").get(id, userId);
   return row ? rowToNotification(row) : null;
 }
 
@@ -768,44 +888,46 @@ const ACHIEVEMENTS = {
   first_report: {
     key: "first_report",
     name: "新手识别员",
-    description: "提交第一份外来物种上报",
+    description: "第一份有效上报通过审核",
     badge: "/static/images/badge-newbie.png",
-    condition: (stats) => stats.totalReports >= 1
+    condition: (stats) => stats.approvedReports >= 1
   },
   eco_guard: {
     key: "eco_guard",
     name: "生态卫士",
-    description: "累计提交5份上报",
+    description: "累计5份上报通过审核",
     badge: "/static/images/badge-ecoguard.png",
-    condition: (stats) => stats.totalReports >= 5
+    condition: (stats) => stats.approvedReports >= 5
   },
   contributor: {
     key: "contributor",
     name: "社区贡献者",
-    description: "累计10份上报或5份审核通过",
+    description: "累计20份上报通过审核",
     badge: "/static/images/badge-contributor.png",
-    condition: (stats) => stats.totalReports >= 10 || stats.approvedReports >= 5
+    condition: (stats) => stats.approvedReports >= 20
   },
   expert: {
     key: "expert",
     name: "火眼金睛",
-    description: "累计20份上报或10份审核通过",
+    description: "累计50份上报通过审核",
     badge: "/static/images/badge-expert.png",
-    condition: (stats) => stats.totalReports >= 20 || stats.approvedReports >= 10
+    condition: (stats) => stats.approvedReports >= 50
   },
   honorary_medal: {
     key: "honorary_medal",
     name: "物种专家",
-    description: "累计50份上报或获得所有其他成就",
+    description: "累计100份上报通过审核",
     badge: "/static/images/badge-species.png",
-    condition: (stats) => stats.totalReports >= 50
+    condition: (stats) => stats.approvedReports >= 100
   }
 };
 
 function getAchievementStats(userId) {
   const d = getDb();
   const totalReports = d.prepare("SELECT COUNT(*) as c FROM reports WHERE user_id = ?").get(userId)?.c || 0;
-  const approvedReports = d.prepare("SELECT COUNT(*) as c FROM reports WHERE user_id = ? AND status = 'approved'").get(userId)?.c || 0;
+  const approvedReports = d.prepare(
+    "SELECT COUNT(*) as c FROM reports WHERE user_id = ? AND status = 'approved' AND points_eligible = 1"
+  ).get(userId)?.c || 0;
   return { totalReports, approvedReports };
 }
 
@@ -850,11 +972,11 @@ function getAllAchievementsWithStatus(userId) {
 
 function getAchievementProgress(key, stats) {
   const thresholds = {
-    first_report: { current: stats.totalReports, target: 1 },
-    eco_guard: { current: stats.totalReports, target: 5 },
-    contributor: { current: Math.max(stats.totalReports, stats.approvedReports * 2), target: 10 },
-    expert: { current: Math.max(stats.totalReports, stats.approvedReports * 2), target: 20 },
-    honorary_medal: { current: stats.totalReports, target: 50 }
+    first_report: { current: stats.approvedReports, target: 1 },
+    eco_guard: { current: stats.approvedReports, target: 5 },
+    contributor: { current: stats.approvedReports, target: 20 },
+    expert: { current: stats.approvedReports, target: 50 },
+    honorary_medal: { current: stats.approvedReports, target: 100 }
   };
   return thresholds[key] || { current: 0, target: 1 };
 }
@@ -887,7 +1009,8 @@ function getUserDailyReportCount(userId) {
 function checkReportLimit(userId) {
   const credit = getUserCredit(userId);
   const todayCount = getUserDailyReportCount(userId);
-  const dailyLimit = credit < 60 ? 2 : 5;
+  const privileges = getUserPrivileges(userId);
+  const dailyLimit = privileges.dailyReportLimit;
   return {
     allowed: todayCount < dailyLimit,
     remaining: Math.max(0, dailyLimit - todayCount),
@@ -899,28 +1022,35 @@ function checkReportLimit(userId) {
 // --- Image fingerprint (dedup) ---
 
 function checkImageDuplicate(md5Hash) {
-  const row = getDb().prepare("SELECT * FROM image_fingerprints WHERE md5_hash = ?").get(md5Hash);
+  const row = getDb().prepare(
+    "SELECT * FROM image_fingerprints WHERE md5_hash = ? AND julianday(created_at) > julianday('now', '-7 days')"
+  ).get(md5Hash);
   return !!row;
 }
 
 function addImageFingerprint(md5Hash, userId, fileSize, width, height) {
   const d = getDb();
-  try {
-    d.prepare("INSERT OR IGNORE INTO image_fingerprints (md5_hash, user_id, file_size, width, height) VALUES (?, ?, ?, ?, ?)").run(
-      md5Hash, userId, fileSize || 0, width || 0, height || 0
-    );
-  } catch (_e) { /* ignore duplicate */ }
+  d.prepare(`
+    INSERT INTO image_fingerprints (md5_hash, user_id, file_size, width, height)
+    VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT(md5_hash) DO UPDATE SET
+      user_id = excluded.user_id,
+      file_size = excluded.file_size,
+      width = excluded.width,
+      height = excluded.height,
+      created_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+  `).run(md5Hash, userId, fileSize || 0, width || 0, height || 0);
 }
 
 // --- Spatial-temporal dedup (200m + 12h) ---
 
 function checkGeotemporalDuplicate(userId, latitude, longitude) {
-  if (!latitude || !longitude) return false;
+  if (!Number.isFinite(Number(latitude)) || !Number.isFinite(Number(longitude))) return false;
   const d = getDb();
   const nearby = d.prepare(`
     SELECT id FROM reports
     WHERE user_id = ?
-      AND created_at > datetime('now', '-12 hours')
+      AND julianday(created_at) > julianday('now', '-12 hours')
       AND ABS(latitude - ?) < 0.002
       AND ABS(longitude - ?) < 0.002
     LIMIT 1
@@ -934,16 +1064,12 @@ function createReportWithPoints(payload) {
   const d = getDb();
   const id = `report-${crypto.randomUUID()}`;
 
-  // Determine if this is first report
-  const existingReports = d.prepare("SELECT COUNT(*) as c FROM reports WHERE user_id = ?").get(payload.userId || "user-anonymous");
-  const isFirstReport = existingReports.c === 0;
-
   // Check geotemporal duplicate
   const isDupe = checkGeotemporalDuplicate(payload.userId || "user-anonymous", payload.latitude, payload.longitude);
 
   d.prepare(`
-    INSERT INTO reports (id, user_id, species_id, ai_top1, ai_score, ai_candidates, image_url, latitude, longitude, address, remark, status, image_fingerprint)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)
+    INSERT INTO reports (id, user_id, species_id, ai_top1, ai_score, ai_candidates, image_url, latitude, longitude, address, remark, status, image_fingerprint, points_eligible)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
   `).run(
     id,
     payload.userId || "user-anonymous",
@@ -956,42 +1082,26 @@ function createReportWithPoints(payload) {
     Number(payload.longitude || 0),
     payload.address || "",
     payload.remark || "",
-    payload.imageFingerprint || ""
+    payload.imageFingerprint || "",
+    isDupe ? 0 : 1
   );
 
   const report = getReportById(id);
-  const userId = payload.userId || "user-anonymous";
-  const pointsDelta = [];
-
-  if (!isDupe) {
-    const pointsLedger = require("./points-ledger");
-    pointsDelta.push(pointsLedger.awardReportSubmitted(userId, id));
-
-    if (isFirstReport) {
-      pointsDelta.push(pointsLedger.awardFirstReport(userId, id));
-    } else {
-      const streak = checkStreakBonus(userId);
-      if (streak) {
-        pointsDelta.push(pointsLedger.awardStreakBonus(userId, id));
-      }
-    }
-  }
 
   return {
     report,
-    pointsDelta,
-    isDupe  // reflects geotemporal dedup check result; caller (index.js) handles points suppression
+    pointsDelta: [],
+    isDupe
   };
 }
 
 function checkStreakBonus(userId) {
   const d = getDb();
-  // Check last 3 days - must have at least one report each day
-  const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
   // Get unique dates of user reports in last 30 days
   const dates = d.prepare(`
     SELECT DISTINCT date(created_at) as d FROM reports
-    WHERE user_id = ? AND created_at > datetime('now', '-30 days')
+    WHERE user_id = ? AND status = 'approved' AND points_eligible = 1
+      AND julianday(created_at) > julianday('now', '-30 days')
     ORDER BY d DESC
   `).all(userId).map(r => r.d);
 
@@ -1013,7 +1123,7 @@ function checkStreakBonus(userId) {
   // Check no streak_bonus awarded in last 3 days
   const recentStreak = d.prepare(`
     SELECT id FROM points_log WHERE user_id = ? AND action = 'streak_bonus'
-    AND created_at > datetime('now', '-3 days') LIMIT 1
+    AND julianday(created_at) > julianday('now', '-3 days') LIMIT 1
   `).get(userId);
 
   return !recentStreak;
@@ -1042,9 +1152,13 @@ function seedProductCategories(categories) {
 
 function getUserPrivileges(userId) {
   const earned = getUserAchievements(userId);
+  const credit = getUserCredit(userId);
+  const badgeDailyLimit = earned.includes("eco_guard") ? 10 : 5;
   return {
-    dailyReportLimit: earned.includes("eco_guard") ? 7 : 5,
+    dailyReportLimit: credit < 60 ? 2 : badgeDailyLimit,
+    badgeDailyReportLimit: badgeDailyLimit,
     highQualityBonus: earned.includes("contributor") ? 5 : 0,
+    canExportReports: earned.includes("expert"),
     canExportWeek: earned.includes("expert"),
     showExpertBadge: earned.includes("honorary_medal"),
     earnedBadges: earned
@@ -1141,27 +1255,21 @@ function rowToOrder(row) {
   };
 }
 
-function createOrder(userId, productId, shippingInfo) {
-  const d = getDb();
-  const id = `order-${Date.now()}-${crypto.randomBytes(4).toString("hex")}`;
-  d.prepare(`
-    INSERT INTO orders (id, user_id, product_id, status, shipping_name, shipping_phone, shipping_address)
-    VALUES (?, ?, ?, 'pending', ?, ?, ?)
-  `).run(
-    id, userId, productId,
-    shippingInfo.name || "",
-    shippingInfo.phone || "",
-    shippingInfo.address || ""
-  );
-  return rowToOrder(d.prepare("SELECT * FROM orders WHERE id = ?").get(id));
-}
-
 function getOrdersByUser(userId) {
   return getDb().prepare("SELECT * FROM orders WHERE user_id = ? ORDER BY created_at DESC").all(userId).map(rowToOrder);
 }
 
+function getAllOrders() {
+  return getDb().prepare("SELECT * FROM orders ORDER BY created_at DESC").all().map(rowToOrder);
+}
+
 function updateOrderStatus(orderId, status) {
-  getDb().prepare("UPDATE orders SET status = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = ?").run(status, orderId);
+  const d = getDb();
+  const result = d.prepare(
+    "UPDATE orders SET status = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = ?"
+  ).run(status, orderId);
+  if (!result.changes) return null;
+  return rowToOrder(d.prepare("SELECT * FROM orders WHERE id = ?").get(orderId));
 }
 
 // --- Leaderboard ---
@@ -1174,46 +1282,51 @@ function getLeaderboard(type, limit = 50) {
   if (type === "weekly") {
     const weekStart = new Date(now.getTime() - now.getDay() * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
     rows = d.prepare(`
-      SELECT r.user_id, u.username, COUNT(*) as cnt
-      FROM reports r
-      JOIN users u ON r.user_id = u.id
-      WHERE r.created_at >= ? AND r.status != 'rejected'
-      GROUP BY r.user_id
-      ORDER BY cnt DESC LIMIT ?
+      SELECT p.user_id, u.username, SUM(p.amount) AS score
+      FROM points_log p
+      JOIN users u ON p.user_id = u.id
+      WHERE p.created_at >= ?
+      GROUP BY p.user_id
+      HAVING score > 0
+      ORDER BY score DESC, u.username ASC LIMIT ?
     `).all(weekStart, limit);
   } else if (type === "total") {
     rows = d.prepare(`
-      SELECT r.user_id, u.username, COUNT(*) as cnt
-      FROM reports r
-      JOIN users u ON r.user_id = u.id
-      WHERE r.status = 'approved'
-      GROUP BY r.user_id
-      ORDER BY cnt DESC LIMIT ?
+      SELECT p.user_id, u.username, p.total AS score
+      FROM points p
+      JOIN users u ON p.user_id = u.id
+      WHERE p.total > 0
+      ORDER BY score DESC, u.username ASC LIMIT ?
     `).all(limit);
   } else if (type === "newcomer") {
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
     rows = d.prepare(`
-      SELECT r.user_id, u.username, COUNT(*) as cnt
-      FROM reports r
-      JOIN users u ON r.user_id = u.id
-      WHERE r.created_at >= ? AND r.status != 'rejected'
-        AND u.created_at >= ?
-      GROUP BY r.user_id
-      ORDER BY cnt DESC LIMIT ?
-    `).all(thirtyDaysAgo, thirtyDaysAgo, limit);
+      SELECT u.id AS user_id, u.username, COALESCE(p.total, 0) AS score
+      FROM users u
+      LEFT JOIN points p ON p.user_id = u.id
+      WHERE u.created_at >= ?
+      ORDER BY score DESC, u.username ASC LIMIT ?
+    `).all(thirtyDaysAgo, limit);
   }
 
-  return rows.map((r, i) => ({
-    rank: i + 1,
-    userId: r.user_id,
-    username: r.username,
-    count: r.cnt
-  }));
+  let previousScore = null;
+  let previousRank = 0;
+  return rows.map((r, i) => {
+    const score = Number(r.score || 0);
+    const rank = previousScore === score ? previousRank : i + 1;
+    previousScore = score;
+    previousRank = rank;
+    return {
+      rank,
+      userId: r.user_id,
+      username: r.username,
+      score,
+      count: score
+    };
+  });
 }
 
-// --- seedProducts upgrade ---
-
-function seedProductsFull(products) {
+function seedProducts(products) {
   const d = getDb();
   const insert = d.prepare(`
     INSERT OR REPLACE INTO products (id, name, description, points_cost, image_url, stock, category_id, is_virtual, requirement, sort_order)
@@ -1251,6 +1364,7 @@ module.exports = {
   getReportsByUser,
   getSpeciesReports,
   getReportById,
+  getReportByImageUrl,
   createReport,
   reviewReport,
   getReviewLogs,
@@ -1264,6 +1378,7 @@ module.exports = {
   createUser,
   getUserByUsername,
   getUserById,
+  hasPublicAvatarUrl,
   getUserByOpenId,
   createUserFromOpenId,
   authenticateUser,
@@ -1274,13 +1389,12 @@ module.exports = {
   getPoints,
   addPoints,
   getProducts,
-  seedProducts: seedProductsFull,
+  seedProducts,
   getUserPurchases,
   getAchievementStats,
   getUserAchievements,
   checkAndAwardAchievements,
   getAllAchievementsWithStatus,
-  // new
   getUserCredit,
   updateUserCredit,
   checkReportLimit,
@@ -1293,6 +1407,7 @@ module.exports = {
   getUserPrivileges,
   createPurchaseFull,
   getOrdersByUser,
+  getAllOrders,
   updateOrderStatus,
   getLeaderboard
 };

@@ -4,6 +4,7 @@ dist/
 *.log
 Thumbs.db
 miniprogram/.idea/
+miniprogram/project.private.config.json
 server/uploads/*
 !server/uploads/.gitkeep
 server/data/runtime-data.json

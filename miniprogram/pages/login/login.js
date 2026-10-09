@@ -6,7 +6,7 @@ Page({
     password: "",
     error: "",
     submitting: false,
-    showPassword: true
+    showPassword: false
   },
 
   onUsernameInput(e) {
@@ -23,7 +23,7 @@ Page({
 
   async onLogin() {
     var username = this.data.username.trim();
-    var password = this.data.password.trim();
+    var password = this.data.password;
 
     if (!username || !password) {
       this.setData({ error: "请填写用户名和密码" });
@@ -46,7 +46,7 @@ Page({
 
   async onRegister() {
     var username = this.data.username.trim();
-    var password = this.data.password.trim();
+    var password = this.data.password;
 
     if (!username || !password) {
       this.setData({ error: "请填写用户名和密码" });
@@ -58,8 +58,18 @@ Page({
       return;
     }
 
-    if (password.length < 4) {
-      this.setData({ error: "密码至少4位" });
+    if (username.length > 32) {
+      this.setData({ error: "用户名不能超过32位" });
+      return;
+    }
+
+    if (password.length < 8) {
+      this.setData({ error: "密码至少8位" });
+      return;
+    }
+
+    if (password.length > 128) {
+      this.setData({ error: "密码不能超过128位" });
       return;
     }
 

@@ -20,7 +20,7 @@
         <input
           class="login-input password-input"
           type="{{showPassword ? 'text' : 'password'}}"
-          placeholder="输入密码（至少4位）"
+          placeholder="输入密码（至少8位）"
           value="{{password}}"
           bindinput="onPasswordInput"
         />

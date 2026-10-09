@@ -11,7 +11,9 @@ Page({
     loggedIn: false,
     username: "",
     statsCollapsed: false,
-    speciesCollapsed: false
+    speciesCollapsed: false,
+    loading: true,
+    loadError: ""
   },
 
   toggleStats() {
@@ -44,25 +46,21 @@ Page({
     this.loadData();
   },
 
+  retryLoad() {
+    this.loadData();
+  },
+
   checkLogin() {
     var token = api.getToken();
-    var username = "";
-    if (token) {
-      try {
-        var parts = token.split(".");
-        if (parts.length === 3) {
-          var payload = JSON.parse(decodeURIComponent(parts[1].replace(/-/g, "+").replace(/_/g, "/").split("").map(function (c) { return "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2); }).join("")));
-          username = payload.username || "";
-        }
-      } catch (_e) { /* ignore */ }
-    }
     this.setData({
       loggedIn: !!token,
-      username: username
+      username: token ? api.getMyUsername() : ""
     });
   },
 
   async loadData() {
+    var firstLoad = !this.data.species.length && !this.data.stats;
+    this.setData({ loading: firstLoad, loadError: "" });
     try {
       var results = await Promise.all([api.getStats(), api.getSpecies()]);
       var statsRes = results[0];
@@ -86,7 +84,9 @@ Page({
       this.setData({
         stats: statsRes.item,
         species: resolvedItems,
-        filteredSpecies: filtered
+        filteredSpecies: filtered,
+        loading: false,
+        loadError: ""
       });
 
       // Download thumbnails concurrently (max 3 at a time)
@@ -100,7 +100,15 @@ Page({
         if (s.avatar && s.avatar.startsWith("http")) {
           api.downloadImage(s.avatar).then(function (localPath) {
             if (localPath) {
-              self.setData({ ["species[" + i + "].avatar"]: localPath });
+              var patch = {};
+              patch["species[" + i + "].avatar"] = localPath;
+              var visibleIndex = self.data.filteredSpecies.findIndex(function (item) {
+                return item.id === s.id;
+              });
+              if (visibleIndex >= 0) {
+                patch["filteredSpecies[" + visibleIndex + "].avatar"] = localPath;
+              }
+              self.setData(patch);
             }
             downloadNext();
           }).catch(function () {
@@ -114,9 +122,9 @@ Page({
         downloadNext();
       }
     } catch (error) {
-      wx.showToast({
-        title: "请确认后端服务已启动",
-        icon: "none"
+      this.setData({
+        loading: false,
+        loadError: error.message || "首页数据加载失败"
       });
     }
   },
@@ -166,7 +174,8 @@ Page({
   },
 
   onPullDownRefresh() {
-    this.loadData();
-    wx.stopPullDownRefresh();
+    this.loadData().finally(function () {
+      wx.stopPullDownRefresh();
+    });
   }
 });

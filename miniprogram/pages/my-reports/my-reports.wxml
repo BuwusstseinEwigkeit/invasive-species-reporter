@@ -19,6 +19,12 @@
     <view class="skeleton-line w50"></view>
   </view>
 
+  <view wx:elif="{{loadError && !reports.length}}" class="empty-state">
+    <text class="empty-icon">⚠</text>
+    <text class="muted">{{loadError}}</text>
+    <button class="ghost-button" hover-class="hover-scale" bindtap="retryLoad">重新加载</button>
+  </view>
+
   <view wx:elif="{{!filteredReports.length}}" class="empty-state">
     <text class="empty-icon">📋</text>
     <text class="muted">没有匹配的上报记录</text>
@@ -30,7 +36,7 @@
       hover-class="hover-bg"
       wx:for="{{filteredReports}}"
       wx:key="id"
-      data-id="{{item.speciesId}}"
+      data-id="{{item.id}}"
       bindtap="openDetail"
     >
       <view class="report-main">
@@ -39,8 +45,9 @@
         <text class="muted time">{{item.createdAt}}</text>
       </view>
       <text class="status-tag tag-{{item.status}}">
-        {{item.status === 'approved' ? '已通过' : item.status === 'rejected' ? '已驳回' : '待审核'}}
+        {{item.status === 'approved' ? '已通过' : item.status === 'rejected' ? '已驳回' : item.status === 'spam' ? '已标记无效' : '待审核'}}
       </text>
     </view>
+    <text class="muted" wx:if="{{loadingMore}}">正在加载更多…</text>
   </view>
 </view>

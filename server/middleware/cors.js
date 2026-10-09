@@ -11,21 +11,23 @@ if (isProduction && allowedOrigins.length === 0) {
 }
 
 function corsMiddleware(req, res, next) {
+  const origin = req.headers.origin;
   if (isProduction && allowedOrigins.length > 0 && !allowedOrigins.includes("*")) {
-    const origin = req.headers.origin;
-    if (!allowedOrigins.includes(origin)) {
+    // CORS is a browser boundary. Native/mini-program/server-to-server clients may
+    // legitimately omit Origin and should not be rejected for that reason.
+    if (origin && !allowedOrigins.includes(origin)) {
       res.header("Access-Control-Allow-Origin", "null");
       res.status(403).json({ success: false, error: "CORS not allowed.", code: 403 });
       return;
     }
-    res.header("Access-Control-Allow-Origin", origin);
+    if (origin) res.header("Access-Control-Allow-Origin", origin);
   } else if (allowedOrigins.includes("*")) {
-    res.header("Access-Control-Allow-Origin", req.headers.origin || "*");
-  } else {
+    res.header("Access-Control-Allow-Origin", origin || "*");
+  } else if (origin) {
     res.header("Access-Control-Allow-Origin", "null");
   }
 
-  res.header("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+  res.header("Access-Control-Allow-Methods", "GET,POST,PATCH,OPTIONS");
   res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
   if (req.method === "OPTIONS") {
     res.status(204).end();

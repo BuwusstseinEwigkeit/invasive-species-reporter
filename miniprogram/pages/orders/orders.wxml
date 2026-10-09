@@ -1,0 +1,70 @@
+<view class="page-shell">
+  <view class="loading-card" wx:if="{{loading}}">
+    <view class="skeleton-line w80"></view>
+    <view class="skeleton-line w60"></view>
+  </view>
+
+  <view class="empty-state" wx:elif="{{loadError}}">
+    <text class="empty-icon">⚠</text>
+    <text class="muted">{{loadError}}</text>
+    <button class="ghost-button" hover-class="hover-scale" bindtap="retryLoad">重新加载</button>
+  </view>
+
+  <block wx:else>
+    <view class="card section-card">
+      <text class="section-title">兑换记录</text>
+      <view class="empty-state compact" wx:if="{{!purchases.length}}">
+        <text class="muted">暂无兑换记录</text>
+      </view>
+      <view class="record-row" wx:for="{{purchases}}" wx:key="id">
+        <view class="record-main">
+          <text class="record-title">{{item.productName}}</text>
+          <text class="muted">{{item.createdAt}}</text>
+        </view>
+        <text class="record-tag">{{item.isVirtual ? "虚拟权益" : "实物兑换"}}</text>
+      </view>
+    </view>
+
+    <view class="card section-card">
+      <text class="section-title">我的实物订单</text>
+      <view class="empty-state compact" wx:if="{{!orders.length}}">
+        <text class="muted">暂无实物订单</text>
+      </view>
+      <view class="order-card" wx:for="{{orders}}" wx:key="id">
+        <view class="record-row">
+          <view class="record-main">
+            <text class="record-title">{{item.productName}}</text>
+            <text class="muted">{{item.createdAt}}</text>
+          </view>
+          <text class="record-tag">{{item.statusText}}</text>
+        </view>
+        <text class="muted" wx:if="{{item.shippingName}}">收件人：{{item.shippingName}} {{item.shippingPhone}}</text>
+        <text class="muted" wx:if="{{item.shippingAddress}}">地址：{{item.shippingAddress}}</text>
+      </view>
+    </view>
+
+    <view class="card section-card" wx:if="{{isAdmin}}">
+      <text class="section-title">管理员履约台</text>
+      <view class="empty-state compact" wx:if="{{!adminOrders.length}}">
+        <text class="muted">暂无待管理订单</text>
+      </view>
+      <view class="order-card admin-order" wx:for="{{adminOrders}}" wx:key="id">
+        <view class="record-row">
+          <view class="record-main">
+            <text class="record-title">{{item.productName}}</text>
+            <text class="muted">用户 {{item.userId}} · {{item.createdAt}}</text>
+          </view>
+          <text class="record-tag">{{item.statusText}}</text>
+        </view>
+        <text class="muted">收件人：{{item.shippingName}} {{item.shippingPhone}}</text>
+        <text class="muted">地址：{{item.shippingAddress}}</text>
+        <view class="admin-actions">
+          <button size="mini" data-id="{{item.id}}" data-status="processing" bindtap="changeOrderStatus" disabled="{{updatingOrderId}}">处理中</button>
+          <button size="mini" data-id="{{item.id}}" data-status="shipped" bindtap="changeOrderStatus" disabled="{{updatingOrderId}}">已发货</button>
+          <button size="mini" data-id="{{item.id}}" data-status="completed" bindtap="changeOrderStatus" disabled="{{updatingOrderId}}">完成</button>
+          <button size="mini" data-id="{{item.id}}" data-status="cancelled" bindtap="changeOrderStatus" disabled="{{updatingOrderId}}">取消</button>
+        </view>
+      </view>
+    </view>
+  </block>
+</view>

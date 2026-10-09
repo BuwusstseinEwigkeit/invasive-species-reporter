@@ -1,5 +1,7 @@
 const { Router } = require("express");
+const path = require("path");
 const { authRequired } = require("../middleware/auth");
+const { getUploadForUser, removeUpload } = require("../lib/upload-store");
 const {
   getPoints,
   getNotifications,
@@ -49,7 +51,7 @@ router.get("/notifications/:userId", authRequired, (req, res) => {
 
 // POST /api/notifications/:id/read
 router.post("/notifications/:id/read", authRequired, (req, res) => {
-  const notif = markNotificationRead(req.params.id);
+  const notif = markNotificationRead(req.params.id, req.user.userId);
   if (!notif) {
     sendError(res, "Not Found", 404);
     return;
@@ -107,11 +109,45 @@ router.post("/user/avatar", authRequired, (req, res) => {
     sendError(res, "avatarUrl is required.", 400);
     return;
   }
-  const user = updateUserAvatar(req.user.userId, avatarUrl);
+
+  const rawAvatarUrl = String(avatarUrl || "").trim();
+  if (!rawAvatarUrl) {
+    const user = updateUserAvatar(req.user.userId, "");
+    res.json({ item: { avatarUrl: user ? user.avatarUrl : "" } });
+    return;
+  }
+
+  let pathname = rawAvatarUrl;
+  try {
+    if (/^https?:\/\//i.test(rawAvatarUrl)) {
+      pathname = new URL(rawAvatarUrl).pathname;
+    } else {
+      pathname = rawAvatarUrl.split("?")[0];
+    }
+  } catch (_e) {
+    sendError(res, "Invalid avatarUrl.", 400);
+    return;
+  }
+
+  if (!pathname.startsWith("/uploads/")) {
+    sendError(res, "Avatar must come from an owned upload.", 400);
+    return;
+  }
+
+  const fileId = path.posix.basename(pathname);
+  const upload = getUploadForUser(fileId, req.user.userId);
+  if (!upload) {
+    sendError(res, "Avatar upload not found or not owned by current user.", 404);
+    return;
+  }
+
+  const storedAvatarUrl = `/uploads/${upload.filename}`;
+  const user = updateUserAvatar(req.user.userId, storedAvatarUrl);
   if (!user) {
     sendError(res, "User not found.", 404);
     return;
   }
+  removeUpload(upload.fileId);
   res.json({ item: { avatarUrl: user.avatarUrl } });
 });
 
